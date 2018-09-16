@@ -26,7 +26,8 @@ class App extends Component {
       },
       startAddress: "",
       endAddress: "",
-      pois: []
+      pois: [],
+      debugMode: true
     };
 
     this.driver = neo4j.driver(
@@ -38,20 +39,19 @@ class App extends Component {
       { encrypted: false }
     );
     this.fetchBusinesses();
-
   }
 
-  setStartAddress = (startAddress) => {
+  setStartAddress = startAddress => {
     this.setState({
       startAddress
-    })
-  }
+    });
+  };
 
-  setEndAddress = (endAddress) => {
+  setEndAddress = endAddress => {
     this.setState({
       endAddress
-    })
-  }
+    });
+  };
 
   onDatesChange = ({ startDate, endDate }) => {
     if (startDate && endDate) {
@@ -62,7 +62,6 @@ class App extends Component {
         },
         () => {
           this.fetchBusinesses();
-          
         }
       );
     } else {
@@ -72,6 +71,16 @@ class App extends Component {
       });
     }
   };
+
+  handleDebugChange = (event) => {
+    console.log(event);
+    const target = event.target;
+    const value = target.type === 'checkbox' ? target.checked : target.value;
+
+    this.setState({
+      debugMode: value
+    });
+  }
 
   onFocusChange = focusedInput => this.setState({ focusedInput });
 
@@ -102,7 +111,7 @@ class App extends Component {
   //     // RETURN a.location.latitude AS latitude, a.location.longitude AS longitude, a.address AS address LIMIT 1;
   //     //`,
   //     `MATCH (p:PointOfInterest)
-      
+
   //     `
   //     {
   //       startAddress
@@ -132,7 +141,6 @@ class App extends Component {
 
   // }
 
-
   fetchBusinesses = () => {
     const { mapCenter, startDate, endDate } = this.state;
     const session = this.driver.session();
@@ -150,14 +158,14 @@ class App extends Component {
         {
           lat: mapCenter.latitude,
           lon: mapCenter.longitude,
-          radius: mapCenter.radius,
+          radius: mapCenter.radius
         }
       )
       .then(result => {
         console.log(result);
         const record = result.records[0];
         const pois = record.get("pois");
-        
+
         this.setState({
           pois
         });
@@ -176,7 +184,6 @@ class App extends Component {
       this.state.mapCenter.longitude !== prevState.mapCenter.longitude
     ) {
       this.fetchBusinesses();
-      
     }
     if (
       this.state.selectedBusiness &&
@@ -200,7 +207,6 @@ class App extends Component {
       },
       () => {
         this.fetchBusinesses();
-        
       }
     );
   };
@@ -264,7 +270,7 @@ class App extends Component {
                     className="form-control"
                     placeholder="Latitude"
                     value={this.state.mapCenter.latitude}
-                    onChange={()=>(true)}
+                    onChange={() => true}
                   />
                 </div>
               </div>
@@ -279,14 +285,14 @@ class App extends Component {
                     className="form-control"
                     placeholder="Longitude"
                     value={this.state.mapCenter.longitude}
-                    onChange={()=>true}
+                    onChange={() => true}
                   />
                 </div>
               </div>
 
               <div className="col-sm-2">
                 <div className="tool timeframe">
-                  <h5>Start Address</h5>
+                  <h5>Start POI</h5>
                   <input
                     type="text"
                     id="address-start"
@@ -300,7 +306,7 @@ class App extends Component {
 
               <div className="col-sm-2">
                 <div className="tool timeframe">
-                  <h5>End Address</h5>
+                  <h5>End POI</h5>
                   <input
                     type="text"
                     id="address-end"
@@ -314,16 +320,44 @@ class App extends Component {
 
               <div className="col-sm-2">
                 <div className="tool">
-                  <h5>OSM Routing w/ Neo4j</h5>
+                  <fieldset>
+                    <div>
+                      <input type="radio" id="huey" name="drone" value="huey" />
+                      <label for="huey">Shortest Path</label>
+                    </div>
+
+                    <div>
+                      <input
+                        type="radio"
+                        id="dewey"
+                        name="drone"
+                        value="dewey"
+                      />
+                      <label for="dewey">Dijkstra</label>
+                    </div>
+
+                    <div>
+                      <input
+                        type="radio"
+                        id="louie"
+                        name="drone"
+                        value="louie"
+                      />
+                      <label for="louie">A*</label>
+                    </div>
+                  </fieldset>
+                  <input type="checkbox" name="debug" checked={this.state.debugMode ? true : false} onChange={this.handleDebugChange}/>
+                  Debug
+                  {/* <h5>OSM Routing w/ Neo4j</h5>
                   <button id="refresh" className="btn btn-primary btn-block">
                     Refresh
-                  </button>
+                  </button> */}
                 </div>
               </div>
             </div>
           </form>
         </div>
-        <div >
+        <div>
           <div id="app-maparea">
             <Map
               mapSearchPointChange={this.mapSearchPointChange}
@@ -335,10 +369,11 @@ class App extends Component {
               setStartAddress={this.setStartAddress}
               setEndAddress={this.setEndAddress}
               driver={this.driver}
+              debugMode={this.state.debugMode}
             />
           </div>
         </div>
-      </div> 
+      </div>
     );
   }
 }

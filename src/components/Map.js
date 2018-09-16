@@ -9,7 +9,7 @@ class Map extends Component {
     this.state = {
       lng: props.mapCenter.longitude,
       lat: props.mapCenter.latitude,
-      zoom: props.mapCenter.zoom,
+      zoom: props.mapCenter.zoom
     };
 
     this.businessMarkers = [];
@@ -31,7 +31,7 @@ class Map extends Component {
           }
         }
       ]
-    }
+    };
 
     this.routeGeojson = {
       type: "FeatureCollection",
@@ -44,7 +44,6 @@ class Map extends Component {
           }
         }
       ]
-    
     };
 
     this.startGeojson = {
@@ -64,45 +63,38 @@ class Map extends Component {
 
   createDebugIntersection = (lon, lat, radius) => {
     const session = this.props.driver.session();
-    const query = 
-    `
+    const query = `
     MATCH (p:Intersection)
     WHERE distance(p.location, point({latitude: $lat, longitude: $lon})) < $radius * 1000
     MATCH (p)-[r]->(p2:Intersection)
     RETURN COLLECT({startLat: p.location.latitude, startLon: p.location.longitude, endLat: p2.location.latitude, endLon: p2.location.longitude}) AS debug
-    `
+    `;
     console.log(this);
     session
-    .run(query, {lat, lon, radius})
-    .then(result => {
-      console.log(result);
-      const route = result.records[0].get("debug");
+      .run(query, { lat, lon, radius })
+      .then(result => {
+        console.log(result);
+        const route = result.records[0].get("debug");
 
-      this.debugIntersection.features = route.map((e) => {
-        
-        return {
-          type: "Feature",
-          geometry: {
-            type: "LineString",
-            coordinates: [[e.startLon, e.startLat], [e.endLon, e.endLat]]
-          }
-        }
+        this.debugIntersection.features = route.map(e => {
+          return {
+            type: "Feature",
+            geometry: {
+              type: "LineString",
+              coordinates: [[e.startLon, e.startLat], [e.endLon, e.endLat]]
+            }
+          };
+        });
+
+        this.map.getSource("debugIntersection").setData(this.debugIntersection);
       })
+      .catch(error => {
+        console.log(error);
+      })
+      .finally(() => {
+        session.close();
+      });
 
-      this.map.getSource('debugIntersection').setData(this.debugIntersection);
-      
-
-    
-    })
-    .catch(error => {
-      console.log(error);
-    })
-    .finally( () => {
-      session.close();
-    })
-    
-    
-    
     return {
       type: "FeatureCollection",
       features: [
@@ -111,12 +103,11 @@ class Map extends Component {
           geometry: {
             type: "LineString",
             coordinates: []
+          }
         }
-    }
       ]
-    
-    }
-  }
+    };
+  };
 
   // https://stackoverflow.com/questions/37599561/drawing-a-circle-with-the-radius-in-miles-meters-with-mapbox-gl-js
   createGeoJSONCircle = (center, radiusInKm, points) => {
@@ -160,35 +151,32 @@ class Map extends Component {
     };
   };
 
-  geoJSONForPOIs = (pois) => {
-    
-      
-          return pois.map((b) => {
-            return {
-              type: "Feature",
-              geometry: {
-                type: "Point",
-                coordinates: [b.lon, b.lat]
-              },
-              properties: {
-                "title": "",
-                id: b.id,
-                name: b.name,
-                "icon": "monument",
-                'marker-color': '#fc4353',
-              }
-            }
-          })
-        
-      // layout: {
-      //   "icon-image": "{icon}-15",
-      //   "text-field": "{title}",
-      //   "text-font": ["Open Sans Semibold", "Arial Unicode MS Bold"],
-      //   "text-offset": [0, 0.6],
-      //   "text-anchor": "top"
-      // }
-    
-  }
+  geoJSONForPOIs = pois => {
+    return pois.map(b => {
+      return {
+        type: "Feature",
+        geometry: {
+          type: "Point",
+          coordinates: [b.lon, b.lat]
+        },
+        properties: {
+          title: "",
+          id: b.id,
+          name: b.name,
+          icon: "monument",
+          "marker-color": "#fc4353"
+        }
+      };
+    });
+
+    // layout: {
+    //   "icon-image": "{icon}-15",
+    //   "text-field": "{title}",
+    //   "text-font": ["Open Sans Semibold", "Arial Unicode MS Bold"],
+    //   "text-offset": [0, 0.6],
+    //   "text-anchor": "top"
+    // }
+  };
 
   businessPopupHTML = business => {
     return `<ul>
@@ -220,19 +208,18 @@ class Map extends Component {
   setBusinessMarkers() {
     const { businesses } = this.props;
     this.geojson.features = this.geoJSONForPOIs(businesses);
-    this.map.getSource('geojson').setData(this.geojson);
+    this.map.getSource("geojson").setData(this.geojson);
   }
 
   fetchRoute() {
     const session = this.props.driver.session();
-    const query = 
-    `
+    const query = `
     MATCH (a:PointOfInterest) WHERE a.poi_id = $startPOI
     MATCH (b:PointOfInterest) WHERE b.poi_id = $endPOI
     MATCH p=shortestPath((a)-[:ROUTE*..20]-(b))
     UNWIND nodes(p) AS n
     RETURN COLLECT({lat: n.location.latitude, lon: n.location.longitude}) AS route
-    `
+    `;
     // `
     // MATCH p1=(a:Address)-[:CLOSEST]->(:OSMNode)<-[:NODE]-(w1:OSMWayNode)
     // MATCH p2=(b:Address)-[:CLOSEST]->(:OSMNode)<-[:NODE]-(w2:OSMWayNode)
@@ -245,30 +232,26 @@ class Map extends Component {
     // `
     console.log(this);
     session
-    .run(query, {startPOI: this.startPOI, endPOI: this.endPOI})
-    .then(result => {
-      console.log(result);
-      const route = result.records[0].get("route");
+      .run(query, { startPOI: this.startPOI, endPOI: this.endPOI })
+      .then(result => {
+        console.log(result);
+        const route = result.records[0].get("route");
 
-      this.routeGeojson.features[0].geometry.coordinates = route.map((e) => {
-        return([e.lon, e.lat]);
+        this.routeGeojson.features[0].geometry.coordinates = route.map(e => {
+          return [e.lon, e.lat];
+        });
+
+        this.map.getSource("routeGeojson").setData(this.routeGeojson);
       })
-
-      this.map.getSource('routeGeojson').setData(this.routeGeojson);
-      
-
-    
-    })
-    .catch(error => {
-      console.log(error);
-    })
-    .finally( () => {
-      session.close();
-    })
+      .catch(error => {
+        console.log(error);
+      })
+      .finally(() => {
+        session.close();
+      });
   }
 
   componentDidUpdate() {
-    
     this.setStartMarker();
 
     if (this.mapLoaded) {
@@ -311,100 +294,103 @@ class Map extends Component {
         }
       });
 
-      this.map.addSource('geojson', {
-        "type": "geojson",
-        "data": this.geojson
+      this.map.addSource("geojson", {
+        type: "geojson",
+        data: this.geojson
       });
 
-      this.map.addSource('routeGeojson', {
+      this.map.addSource("routeGeojson", {
         type: "geojson",
         data: this.routeGeojson
       });
 
-      this.map.addSource('debugIntersection', {
-        type:'geojson',
+      this.map.addSource("debugIntersection", {
+        type: "geojson",
         data: this.debugIntersection
       });
 
-      this.map.addSource('startGeojson', {
-        type: 'geojson',
+      this.map.addSource("startGeojson", {
+        type: "geojson",
         data: this.startGeojson
       });
 
-      this.map.addSource('endGeojson', {
-        type: 'geojson',
+      this.map.addSource("endGeojson", {
+        type: "geojson",
         data: this.endGeojson
-      })
-
-      
-      this.map.addLayer({
-          id: 'points',
-          type: 'circle',
-          source: 'geojson',
-          paint: {
-              'circle-radius': 5,
-              'circle-color': '#000'
-          },
-          filter: ['in', '$type', 'Point']
       });
 
       this.map.addLayer({
-        id: 'start',
-        type: 'circle',
-        source: 'startGeojson',
+        id: "points",
+        type: "circle",
+        source: "geojson",
         paint: {
-          'circle-radius': 25,
-          'circle-color': 'green'
+          "circle-radius": 5,
+          "circle-color": "#000"
+        },
+        filter: ["in", "$type", "Point"]
+      });
+
+      this.map.addLayer({
+        id: "start",
+        type: "circle",
+        source: "startGeojson",
+        paint: {
+          "circle-radius": 25,
+          "circle-color": "green"
         }
       });
 
       this.map.addLayer({
-        id: 'end',
-        type: 'circle',
-        source: 'endGeojson',
+        id: "end",
+        type: "circle",
+        source: "endGeojson",
         paint: {
-          'circle-radius': 7,
-          'circle-color': 'red'
+          "circle-radius": 7,
+          "circle-color": "red"
         }
-      })
+      });
 
       this.map.addLayer({
-        id: 'debug',
-        type: 'line',
-        source: 'debugIntersection',
+        id: "debug",
+        type: "line",
+        source: "debugIntersection",
         layout: {
-            'line-cap': 'round',
-            'line-join': 'round'
+          "line-cap": "round",
+          "line-join": "round"
         },
         paint: {
-            'line-color': 'black',
-            'line-width': 5
+          "line-color": "black",
+          "line-width": 5
         },
-        filter: ['in', '$type', 'LineString']
-      })
+        filter: ["in", "$type", "LineString"]
+      });
 
       this.map.addLayer({
-        id: 'lines',
-        type: 'line',
-        source: 'routeGeojson',
+        id: "lines",
+        type: "line",
+        source: "routeGeojson",
         layout: {
-            'line-cap': 'round',
-            'line-join': 'round'
+          "line-cap": "round",
+          "line-join": "round"
         },
         paint: {
-            'line-color': 'purple',
-            'line-width': 10
+          "line-color": "purple",
+          "line-width": 10
         },
-        filter: ['in', '$type', 'LineString']
-    } );
+        filter: ["in", "$type", "LineString"]
+      });
 
-      this.map.on('mousemove', (e) => {
-        var features = this.map.queryRenderedFeatures(e.point, { layers: ['points'] });
+      this.map.on("mousemove", e => {
+        var features = this.map.queryRenderedFeatures(e.point, {
+          layers: ["points"]
+        });
         // UI indicator for clicking/hovering a point on the map
-        this.map.getCanvas().style.cursor = (features.length) ? 'pointer' : 'crosshair';
+        this.map.getCanvas().style.cursor = features.length
+          ? "pointer"
+          : "crosshair";
       });
 
-      this.map.on('click','points', (e) => {
+      this.map.on("click", "points", e => {
         console.log(e);
         console.log(e.features[0].properties.id);
         const address = e.features[0].properties.name;
@@ -427,16 +413,16 @@ class Map extends Component {
                 coordinates: e.lngLat
               },
               properties: {
-                "title": "",
+                title: "",
                 name: name,
                 id: name,
-                "icon": "monument",
-                'marker-color': '#fc4353',
+                icon: "monument",
+                "marker-color": "#fc4353"
               }
             }
           ];
-          this.map.getSource('startGeojson').setData(this.startGeojson);
-          this.map.getSource('routeGeojson').setData(this.routeGeojson);
+          this.map.getSource("startGeojson").setData(this.startGeojson);
+          this.map.getSource("routeGeojson").setData(this.routeGeojson);
           this.props.setStartAddress(name);
         } else {
           this.endAddress = name;
@@ -449,11 +435,11 @@ class Map extends Component {
                 coordinates: e.lngLat
               },
               properties: {
-                "title": "",
+                title: "",
                 name: name,
                 id: name,
-                "icon": "monument",
-                'marker-color': '#fc4353',
+                icon: "monument",
+                "marker-color": "#fc4353"
               }
             }
           ];
@@ -462,10 +448,7 @@ class Map extends Component {
           this.props.setEndAddress(name);
           this.fetchRoute();
         }
-      })
-
-    
-    
+      });
     });
 
     const onDragEnd = e => {
@@ -487,7 +470,17 @@ class Map extends Component {
           ).data
         );
 
-      this.createDebugIntersection(lngLat.lng, lngLat.lat, this.props.mapCenter.radius);
+      if (this.props.debugMode) {
+        this.createDebugIntersection(
+          lngLat.lng,
+          lngLat.lat,
+          this.props.mapCenter.radius
+        );
+      } else {
+        this.debugIntersection.features = [];
+        this.map.getSource("debugIntersection").setData(this.debugIntersection);
+
+      }
     };
 
     new mapboxgl.Marker({ color: "red", zIndexOffset: 9999 })
