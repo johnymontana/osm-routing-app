@@ -20,6 +20,19 @@ class Map extends Component {
       features: []
     };
 
+    this.debugIntersection = {
+      type: "FeatureCollection",
+      features: [
+        {
+          type: "Feature",
+          geometry: {
+            type: "LineString",
+            coordinates: []
+          }
+        }
+      ]
+    }
+
     this.routeGeojson = {
       type: "FeatureCollection",
       features: [
@@ -28,8 +41,8 @@ class Map extends Component {
           geometry: {
             type: "LineString",
             coordinates: []
+          }
         }
-    }
       ]
     
     };
@@ -47,6 +60,62 @@ class Map extends Component {
     this.selectingStart = true;
     this.startAddress = this.props.startAddress;
     this.endAddress = this.props.endAddress;
+  }
+
+  createDebugIntersection = (lon, lat, radius) => {
+    const session = this.props.driver.session();
+    const query = 
+    `
+    MATCH (p:Intersection)
+    WHERE distance(p.location, point({latitude: $lat, longitude: $lon})) < $radius * 1000
+    MATCH (p)-[r]->(p2:Intersection)
+    RETURN COLLECT({startLat: p.location.latitude, startLon: p.location.longitude, endLat: p2.location.latitude, endLon: p2.location.longitude}) AS debug
+    `
+    console.log(this);
+    session
+    .run(query, {lat, lon, radius})
+    .then(result => {
+      console.log(result);
+      const route = result.records[0].get("debug");
+
+      this.debugIntersection.features = route.map((e) => {
+        
+        return {
+          type: "Feature",
+          geometry: {
+            type: "LineString",
+            coordinates: [[e.startLon, e.startLat], [e.endLon, e.endLat]]
+          }
+        }
+      })
+
+      this.map.getSource('debugIntersection').setData(this.debugIntersection);
+      
+
+    
+    })
+    .catch(error => {
+      console.log(error);
+    })
+    .finally( () => {
+      session.close();
+    })
+    
+    
+    
+    return {
+      type: "FeatureCollection",
+      features: [
+        {
+          type: "Feature",
+          geometry: {
+            type: "LineString",
+            coordinates: []
+        }
+    }
+      ]
+    
+    }
   }
 
   // https://stackoverflow.com/questions/37599561/drawing-a-circle-with-the-radius-in-miles-meters-with-mapbox-gl-js
@@ -252,6 +321,11 @@ class Map extends Component {
         data: this.routeGeojson
       });
 
+      this.map.addSource('debugIntersection', {
+        type:'geojson',
+        data: this.debugIntersection
+      });
+
       this.map.addSource('startGeojson', {
         type: 'geojson',
         data: this.startGeojson
@@ -292,6 +366,21 @@ class Map extends Component {
           'circle-radius': 7,
           'circle-color': 'red'
         }
+      })
+
+      this.map.addLayer({
+        id: 'debug',
+        type: 'line',
+        source: 'debugIntersection',
+        layout: {
+            'line-cap': 'round',
+            'line-join': 'round'
+        },
+        paint: {
+            'line-color': 'black',
+            'line-width': 5
+        },
+        filter: ['in', '$type', 'LineString']
       })
 
       this.map.addLayer({
@@ -397,6 +486,8 @@ class Map extends Component {
             this.props.mapCenter.radius
           ).data
         );
+
+      this.createDebugIntersection(lngLat.lng, lngLat.lat, this.props.mapCenter.radius);
     };
 
     new mapboxgl.Marker({ color: "red", zIndexOffset: 9999 })
