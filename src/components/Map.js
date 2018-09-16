@@ -213,13 +213,37 @@ class Map extends Component {
 
   fetchRoute() {
     const session = this.props.driver.session();
-    const query = `
+
+    let query;
+
+    if (this.props.routeMode === "shortestpath") {
+      query = `
     MATCH (a:PointOfInterest) WHERE a.poi_id = $startPOI
     MATCH (b:PointOfInterest) WHERE b.poi_id = $endPOI
     MATCH p=shortestPath((a)-[:ROUTE*..20]-(b))
     UNWIND nodes(p) AS n
     RETURN COLLECT({lat: n.location.latitude, lon: n.location.longitude}) AS route
     `;
+    } else if (this.props.routeMode === "dijkstra") {
+      query = `
+      MATCH (a:PointOfInterest) WHERE a.poi_id = $startPOI
+      MATCH (b:PointOfInterest) WHERE b.poi_id = $endPOI
+      CALL algo.shortestPath.stream(a, b, 'distance',{nodeQuery:'OSMNode', relationshipQuery:'ROUTE', defaultValue:1.0, write:'false', writeProperty:'sssp', direction:'BOTH'})
+      YIELD nodeId, cost
+      MATCH (n) WHERE id(n) = nodeId
+      RETURN COLLECT({lat: n.location.latitude, lon: n.location.longitude}) AS route
+      `;
+    } else if (this.props.routeMode === "astar") {
+      throw new Error("Astar routing not yet implemented");
+    } else {
+      query = `
+    MATCH (a:PointOfInterest) WHERE a.poi_id = $startPOI
+    MATCH (b:PointOfInterest) WHERE b.poi_id = $endPOI
+    MATCH p=shortestPath((a)-[:ROUTE*..20]-(b))
+    UNWIND nodes(p) AS n
+    RETURN COLLECT({lat: n.location.latitude, lon: n.location.longitude}) AS route
+    `;
+    }
     // `
     // MATCH p1=(a:Address)-[:CLOSEST]->(:OSMNode)<-[:NODE]-(w1:OSMWayNode)
     // MATCH p2=(b:Address)-[:CLOSEST]->(:OSMNode)<-[:NODE]-(w2:OSMWayNode)
@@ -479,7 +503,6 @@ class Map extends Component {
       } else {
         this.debugIntersection.features = [];
         this.map.getSource("debugIntersection").setData(this.debugIntersection);
-
       }
     };
 

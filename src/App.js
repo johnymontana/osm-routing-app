@@ -27,7 +27,8 @@ class App extends Component {
       startAddress: "",
       endAddress: "",
       pois: [],
-      debugMode: true
+      debugMode: true,
+      routeMode: "shortestpath"
     };
 
     this.driver = neo4j.driver(
@@ -72,15 +73,26 @@ class App extends Component {
     }
   };
 
-  handleDebugChange = (event) => {
+  handleRouteChange = event => {
+    const target = event.target;
+    const value = target.value;
+    this.setState(
+      {
+        routeMode: value
+      },
+      () => console.log(this.state.routeMode)
+    );
+  };
+
+  handleDebugChange = event => {
     console.log(event);
     const target = event.target;
-    const value = target.type === 'checkbox' ? target.checked : target.value;
+    const value = target.type === "checkbox" ? target.checked : target.value;
 
     this.setState({
       debugMode: value
     });
-  }
+  };
 
   onFocusChange = focusedInput => this.setState({ focusedInput });
 
@@ -322,31 +334,51 @@ class App extends Component {
                 <div className="tool">
                   <fieldset>
                     <div>
-                      <input type="radio" id="huey" name="drone" value="huey" />
-                      <label for="huey">Shortest Path</label>
+                      <input
+                        type="radio"
+                        id="shortestpath"
+                        name="shortestpath"
+                        value="shortestpath"
+                        checked={
+                          this.state.routeMode == "shortestpath" ? true : false
+                        }
+                        onChange={this.handleRouteChange}
+                      />
+                      <label for="shortestpath">Shortest Path</label>
                     </div>
 
                     <div>
                       <input
                         type="radio"
-                        id="dewey"
-                        name="drone"
-                        value="dewey"
+                        id="dijkstra"
+                        name="dijkstra"
+                        value="dijkstra"
+                        checked={
+                          this.state.routeMode == "dijkstra" ? true : false
+                        }
+                        onChange={this.handleRouteChange}
                       />
-                      <label for="dewey">Dijkstra</label>
+                      <label for="dijkstra">Dijkstra</label>
                     </div>
 
                     <div>
                       <input
                         type="radio"
-                        id="louie"
-                        name="drone"
-                        value="louie"
+                        id="astar"
+                        name="astar"
+                        value="astar"
+                        checked={this.state.routeMode == "astar" ? true : false}
+                        onChange={this.handleRouteChange}
                       />
-                      <label for="louie">A*</label>
+                      <label for="astar">A*</label>
                     </div>
                   </fieldset>
-                  <input type="checkbox" name="debug" checked={this.state.debugMode ? true : false} onChange={this.handleDebugChange}/>
+                  <input
+                    type="checkbox"
+                    name="debug"
+                    checked={this.state.debugMode ? true : false}
+                    onChange={this.handleDebugChange}
+                  />
                   Debug
                   {/* <h5>OSM Routing w/ Neo4j</h5>
                   <button id="refresh" className="btn btn-primary btn-block">
@@ -370,6 +402,7 @@ class App extends Component {
               setEndAddress={this.setEndAddress}
               driver={this.driver}
               debugMode={this.state.debugMode}
+              routeMode={this.state.routeMode}
             />
           </div>
         </div>
