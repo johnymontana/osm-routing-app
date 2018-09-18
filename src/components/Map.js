@@ -228,14 +228,36 @@ class Map extends Component {
       query = `
       MATCH (a:PointOfInterest) WHERE a.poi_id = $startPOI
       MATCH (b:PointOfInterest) WHERE b.poi_id = $endPOI
-      CALL algo.shortestPath.stream(a, b, 'distance',{nodeQuery:'OSMNode', relationshipQuery:'ROUTE', defaultValue:1.0, write:'false', writeProperty:'sssp', direction:'BOTH'})
-      YIELD nodeId, cost
-      MATCH (n) WHERE id(n) = nodeId
-      RETURN COLLECT({lat: n.location.latitude, lon: n.location.longitude}) AS route
+      CALL algo.shortestPath.stream(a, b, 'distance',
+      {
+        relationshipQuery: "MATCH (a1:OSMNode)-[r:ROUTE]-(a2:OSMNode) WHERE distance(a1.location,$center) < $radius AND distance(a2.location, $center) < $radius RETURN id(a1) as source, id(a2) as target,r.distance as weight", 
+        nodeQuery:"MATCH (a1:OSMNode) WHERE distance(a1.location, $center) < $radius RETURN id(a1) AS id", 
+
+        direction:'both', defaultValue:1.0, graph:'cypher', 
+        params: {center: point({latitude: $routeCenterLat, longitude: $routeCenterLon}), radius: $routeRadius}
+      })
+        YIELD nodeId, cost
+        MATCH (n) WHERE id(n) = nodeId
+        RETURN COLLECT({lat: n.location.latitude, lon: n.location.longitude}) AS route
       `;
     } else if (this.props.routeMode === "astar") {
-      throw new Error("Astar routing not yet implemented");
+      query = `
+      MATCH (a:PointOfInterest) WHERE a.poi_id = $startPOI
+      MATCH (b:PointOfInterest) WHERE b.poi_id = $endPOI
+      CALL algo.shortestPath.astar.stream(a, b, 'distance', 'lat', 'lon',
+        {
+          relationshipQuery: "MATCH (a1:OSMNode)-[r:ROUTE]-(a2:OSMNode) WHERE distance(a1.location,$center) < $radius AND distance(a2.location, $center) < $radius RETURN id(a1) as source, id(a2) as target,r.distance as weight", 
+          nodeQuery:"MATCH (a1:OSMNode) WHERE distance(a1.location, $center) < $radius RETURN id(a1) AS id", 
+
+          direction:'both', defaultValue:1.0, graph:'cypher', 
+          params: {center: point({latitude: $routeCenterLat, longitude: $routeCenterLon}), radius: $routeRadius}
+        })
+      YIELD nodeId, cost
+      MATCH (route:OSMNode) WHERE id(route) = nodeId
+      RETURN COLLECT({lat: route.location.latitude, lon: route.location.longitude}) AS route
+      `;
     } else {
+      // default query, use if
       query = `
     MATCH (a:PointOfInterest) WHERE a.poi_id = $startPOI
     MATCH (b:PointOfInterest) WHERE b.poi_id = $endPOI
@@ -256,7 +278,13 @@ class Map extends Component {
     // `
     console.log(this);
     session
-      .run(query, { startPOI: this.startPOI, endPOI: this.endPOI })
+      .run(query, {
+        startPOI: this.startPOI,
+        endPOI: this.endPOI,
+        routeRadius: this.routeRadius,
+        routeCenterLat: this.routeViewport.latitude,
+        routeCenterLon: this.routeViewport.longitude
+      })
       .then(result => {
         console.log(result);
         const route = result.records[0].get("route");
@@ -483,6 +511,10 @@ class Map extends Component {
         longitude: lngLat.lng,
         zoom: this.map.getZoom()
       };
+
+      this.routeViewport = viewport;
+      this.routeRadius = this.props.mapCenter.radius * 1000;
+
       this.props.mapSearchPointChange(viewport);
 
       this.map
@@ -539,6 +571,7 @@ class Map extends Component {
           ref={el => (this.mapContainer = el)}
           className="absolute top right left bottom"
         />
+        <div id="distance" className="distance-container" />
       </div>
     );
   }

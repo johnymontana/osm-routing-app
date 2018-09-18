@@ -344,7 +344,7 @@ class App extends Component {
                         }
                         onChange={this.handleRouteChange}
                       />
-                      <label for="shortestpath">Shortest Path</label>
+                      <label>Shortest Path</label>
                     </div>
 
                     <div>
@@ -358,7 +358,7 @@ class App extends Component {
                         }
                         onChange={this.handleRouteChange}
                       />
-                      <label for="dijkstra">Dijkstra</label>
+                      <label>Dijkstra</label>
                     </div>
 
                     <div>
@@ -370,7 +370,7 @@ class App extends Component {
                         checked={this.state.routeMode == "astar" ? true : false}
                         onChange={this.handleRouteChange}
                       />
-                      <label for="astar">A*</label>
+                      <label>A*</label>
                     </div>
                   </fieldset>
                   <input
