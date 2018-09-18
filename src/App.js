@@ -97,12 +97,12 @@ class App extends Component {
 
   handleBoroughChange = event => {
     const target = event.target;
-    const value = target.type === 'checkbox' ? target.checked : target.value;
+    const value = target.type === "checkbox" ? target.checked : target.value;
 
     this.setState({
       manhattanOnly: value
-    })
-  }
+    });
+  };
 
   onFocusChange = focusedInput => this.setState({ focusedInput });
 
@@ -170,8 +170,7 @@ class App extends Component {
     let query;
 
     if (this.state.manhattanOnly) {
-      query = 
-      `MATCH (manhattan:OSMRelation) USING INDEX manhattan:OSMRelation(relation_osm_id) WHERE manhattan.relation_osm_id=8398124
+      query = `MATCH (manhattan:OSMRelation) USING INDEX manhattan:OSMRelation(relation_osm_id) WHERE manhattan.relation_osm_id=8398124
       WITH manhattan.polygon as polygon
       MATCH (p:PointOfInterest)
         WHERE distance(p.location, point({latitude: $lat, longitude:$lon})) < ( $radius * 1000)
@@ -179,20 +178,16 @@ class App extends Component {
       RETURN COLLECT({address: "", name: p.name, lat: p.location.latitude, lon: p.location.longitude, id: p.name + toString(p.location.latitude) + toString(p.location.longitude)}) AS pois
       `;
     } else {
-      query = 
-      `MATCH (p:PointOfInterest) WHERE distance(p.location, point({latitude: $lat, longitude:$lon})) < ( $radius * 1000)
+      query = `MATCH (p:PointOfInterest) WHERE distance(p.location, point({latitude: $lat, longitude:$lon})) < ( $radius * 1000)
          RETURN COLLECT({address: "", name: p.name, lat: p.location.latitude, lon: p.location.longitude, id: p.name + toString(p.location.latitude) + toString(p.location.longitude)}) AS pois
         `;
     }
     session
-      .run(
-        query,
-        {
-          lat: mapCenter.latitude,
-          lon: mapCenter.longitude,
-          radius: mapCenter.radius
-        }
-      )
+      .run(query, {
+        lat: mapCenter.latitude,
+        lon: mapCenter.longitude,
+        radius: mapCenter.radius
+      })
       .then(result => {
         console.log(result);
         const record = result.records[0];
@@ -351,79 +346,80 @@ class App extends Component {
               </div>
 
               <div className="col-sm-2">
-                <div className="tool">
-                  <fieldset>
-                    <div>
-                      <input
-                        type="radio"
-                        id="shortestpath"
-                        name="shortestpath"
-                        value="shortestpath"
-                        checked={
-                          this.state.routeMode == "shortestpath" ? true : false
-                        }
-                        onChange={this.handleRouteChange}
-                      />
-                      <label>Shortest Path</label>
-                    </div>
-
-                    <div>
-                      <input
-                        type="radio"
-                        id="dijkstra"
-                        name="dijkstra"
-                        value="dijkstra"
-                        checked={
-                          this.state.routeMode == "dijkstra" ? true : false
-                        }
-                        onChange={this.handleRouteChange}
-                      />
-                      <label>Dijkstra</label>
-                    </div>
-
-                    <div>
-                      <input
-                        type="radio"
-                        id="astar"
-                        name="astar"
-                        value="astar"
-                        checked={this.state.routeMode == "astar" ? true : false}
-                        onChange={this.handleRouteChange}
-                      />
-                      <label>A*</label>
-                    </div>
-                  </fieldset>
-                  
-                  {/* <h5>OSM Routing w/ Neo4j</h5>
-                  <button id="refresh" className="btn btn-primary btn-block">
-                    Refresh
-                  </button> */}
-                </div>
+                <div className="tool" />
               </div>
             </div>
             <div className="row">
-              <div className="col-sm-4">
-                <input
-                  type="checkbox"
-                  name="debug"
-                  checked={this.state.manhattanOnly ? true : false}
-                  onChange={this.handleBoroughChange}
-                />
-                Manhattan Only
-              </div>
-              <div className="col-sm-4">
-              <input
-                    type="checkbox"
-                    name="debug"
-                    checked={this.state.debugMode ? true : false}
-                    onChange={this.handleDebugChange}
-                  />
-                  Debug
-              </div>
-
+              <div className="col-sm-4" />
+              <div className="col-sm-4" />
             </div>
           </form>
         </div>
+        <div id="app-left-side-panel">
+          <h2>Options</h2>
+
+          <div className="row">
+            <input
+              type="checkbox"
+              name="debug"
+              checked={this.state.manhattanOnly ? true : false}
+              onChange={this.handleBoroughChange}
+            />
+            Manhattan Only
+          </div>
+          <div className="row">
+            <input
+              type="checkbox"
+              name="debug"
+              checked={this.state.debugMode ? true : false}
+              onChange={this.handleDebugChange}
+            />
+            Debug
+          </div>
+          <div className="row">
+            <h5>Select Algorithm</h5>
+            <fieldset>
+              <div>
+                <input
+                  type="radio"
+                  id="shortestpath"
+                  name="shortestpath"
+                  value="shortestpath"
+                  checked={
+                    this.state.routeMode == "shortestpath" ? true : false
+                  }
+                  onChange={this.handleRouteChange}
+                />
+                <label>Shortest Path</label>
+              </div>
+
+              <div>
+                <input
+                  type="radio"
+                  id="dijkstra"
+                  name="dijkstra"
+                  value="dijkstra"
+                  checked={this.state.routeMode == "dijkstra" ? true : false}
+                  onChange={this.handleRouteChange}
+                />
+                <label>Dijkstra</label>
+              </div>
+
+              <div>
+                <input
+                  type="radio"
+                  id="astar"
+                  name="astar"
+                  value="astar"
+                  checked={this.state.routeMode == "astar" ? true : false}
+                  onChange={this.handleRouteChange}
+                />
+                <label>A*</label>
+              </div>
+            </fieldset>
+          </div>
+        </div>
+
         <div>
           <div id="app-maparea">
             <Map

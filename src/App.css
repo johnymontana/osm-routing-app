@@ -1,12 +1,21 @@
 
-/* .marker {
-  background-image: url('marker.png');
-  background-size: cover;
-  width: 50px;
-  height: 50px;
-  border-radius: 50%;
-  cursor: pointer;
-} */
+.distance-container {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  z-index: 1;
+}
+
+.distance-container > * {
+  background-color: rgba(0, 0, 0, 0.5);
+  color: #fff;
+  font-size: 11px;
+  line-height: 18px;
+  display: block;
+  margin: 0;
+  padding: 5px 10px;
+  border-radius: 3px;
+}
 
 .App {
   text-align: center;
@@ -138,6 +147,16 @@ body.application {
   z-index: 1;
 }
 
+#app-left-side-panel {
+  background: rgba(0,0,0,.75);
+  box-shadow: 0 1px 5px rgba(0,0,0,.1);
+  color: #fff;
+  position: fixed;
+  top: 100px;
+  width: 10%;
+  z-index: 1;
+}
+
 #app-toolbar .btn-primary {
   background-color: #00afd7;
   border: medium none;
@@ -196,4 +215,8 @@ body.application {
 .tool label,
 .tool h5 {
   text-shadow: 0 0 1px #000;
+}
+
+h5 {
+  padding-top:5px;
 }
