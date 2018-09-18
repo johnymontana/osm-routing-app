@@ -27,7 +27,8 @@ class App extends Component {
       startAddress: "",
       endAddress: "",
       pois: [],
-      debugMode: true,
+      debugMode: false,
+      manhattanOnly: false,
       routeMode: "shortestpath"
     };
 
@@ -94,6 +95,15 @@ class App extends Component {
     });
   };
 
+  handleBoroughChange = event => {
+    const target = event.target;
+    const value = target.type === 'checkbox' ? target.checked : target.value;
+
+    this.setState({
+      manhattanOnly: value
+    })
+  }
+
   onFocusChange = focusedInput => this.setState({ focusedInput });
 
   businessSelected = b => {
@@ -154,19 +164,29 @@ class App extends Component {
   // }
 
   fetchBusinesses = () => {
-    const { mapCenter, startDate, endDate } = this.state;
+    const { mapCenter } = this.state;
     const session = this.driver.session();
+
+    let query;
+
+    if (this.state.manhattanOnly) {
+      query = 
+      `MATCH (manhattan:OSMRelation) USING INDEX manhattan:OSMRelation(relation_osm_id) WHERE manhattan.relation_osm_id=8398124
+      WITH manhattan.polygon as polygon
+      MATCH (p:PointOfInterest)
+        WHERE distance(p.location, point({latitude: $lat, longitude:$lon})) < ( $radius * 1000)
+        AND amanzi.withinPolygon(p.location,polygon)
+      RETURN COLLECT({address: "", name: p.name, lat: p.location.latitude, lon: p.location.longitude, id: p.name + toString(p.location.latitude) + toString(p.location.longitude)}) AS pois
+      `;
+    } else {
+      query = 
+      `MATCH (p:PointOfInterest) WHERE distance(p.location, point({latitude: $lat, longitude:$lon})) < ( $radius * 1000)
+         RETURN COLLECT({address: "", name: p.name, lat: p.location.latitude, lon: p.location.longitude, id: p.name + toString(p.location.latitude) + toString(p.location.longitude)}) AS pois
+        `;
+    }
     session
       .run(
-        `MATCH (p:PointOfInterest) WHERE distance(p.location, point({latitude: $lat, longitude:$lon})) < ( $radius * 1000)
-         RETURN COLLECT({address: "", name: p.name, lat: p.location.latitude, lon: p.location.longitude, id: p.name + toString(p.location.latitude) + toString(p.location.longitude)}) AS pois
-        `,
-        // `
-        // MATCH (a:Address)
-        // WHERE a.street CONTAINS "W  45 ST" AND distance(a.location, point({latitude: $lat, longitude: $lon})) < ( $radius * 1000)
-        // OPTIONAL MATCH (b)-[:IN_CATEGORY]->(c:Category)
-        // RETURN COLLECT({address: a.address, lat: a.location.latitude, lon: a.location.longitude}) AS pois
-        // `,
+        query,
         {
           lat: mapCenter.latitude,
           lon: mapCenter.longitude,
@@ -373,19 +393,34 @@ class App extends Component {
                       <label>A*</label>
                     </div>
                   </fieldset>
-                  <input
-                    type="checkbox"
-                    name="debug"
-                    checked={this.state.debugMode ? true : false}
-                    onChange={this.handleDebugChange}
-                  />
-                  Debug
+                  
                   {/* <h5>OSM Routing w/ Neo4j</h5>
                   <button id="refresh" className="btn btn-primary btn-block">
                     Refresh
                   </button> */}
                 </div>
               </div>
+            </div>
+            <div className="row">
+              <div className="col-sm-4">
+                <input
+                  type="checkbox"
+                  name="debug"
+                  checked={this.state.manhattanOnly ? true : false}
+                  onChange={this.handleBoroughChange}
+                />
+                Manhattan Only
+              </div>
+              <div className="col-sm-4">
+              <input
+                    type="checkbox"
+                    name="debug"
+                    checked={this.state.debugMode ? true : false}
+                    onChange={this.handleDebugChange}
+                  />
+                  Debug
+              </div>
+
             </div>
           </form>
         </div>
