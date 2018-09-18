@@ -244,7 +244,7 @@ class Map extends Component {
       query = `
       MATCH (a:PointOfInterest) WHERE a.poi_id = $startPOI
       MATCH (b:PointOfInterest) WHERE b.poi_id = $endPOI
-      CALL algo.shortestPath.astar.stream(a, b, 'distance', 'lat', 'lon',
+      CALL algo.shortestPath.astar.stream(a, b, 'weight', 'lat', 'lon',
         {
           relationshipQuery: "MATCH (a1:Routable)-[r:ROUTE]-(a2:Routable) WHERE distance(a1.location,$center) < $radius AND distance(a2.location, $center) < $radius RETURN id(a1) as source, id(a2) as target,r.distance as weight", 
           nodeQuery:"MATCH (a1:Routable) WHERE distance(a1.location, $center) < $radius RETURN id(a1) AS id", 
@@ -253,7 +253,7 @@ class Map extends Component {
           params: {center: point({latitude: $routeCenterLat, longitude: $routeCenterLon}), radius: $routeRadius}
         })
       YIELD nodeId, cost
-      MATCH (route:OSMNode) WHERE id(route) = nodeId
+      MATCH (route) WHERE id(route) = nodeId
       RETURN COLLECT({lat: route.location.latitude, lon: route.location.longitude}) AS route
       `;
     } else {
