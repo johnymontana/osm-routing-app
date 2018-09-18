@@ -230,8 +230,8 @@ class Map extends Component {
       MATCH (b:PointOfInterest) WHERE b.poi_id = $endPOI
       CALL algo.shortestPath.stream(a, b, 'distance',
       {
-        relationshipQuery: "MATCH (a1:OSMNode)-[r:ROUTE]-(a2:OSMNode) WHERE distance(a1.location,$center) < $radius AND distance(a2.location, $center) < $radius RETURN id(a1) as source, id(a2) as target,r.distance as weight", 
-        nodeQuery:"MATCH (a1:OSMNode) WHERE distance(a1.location, $center) < $radius RETURN id(a1) AS id", 
+        relationshipQuery: "MATCH (a1:Routable)-[r:ROUTE]-(a2:Routable) WHERE distance(a1.location,$center) < $radius AND distance(a2.location, $center) < $radius RETURN id(a1) as source, id(a2) as target,r.distance as weight", 
+        nodeQuery:"MATCH (a1:Routable) WHERE distance(a1.location, $center) < $radius RETURN id(a1) AS id", 
 
         direction:'both', defaultValue:1.0, graph:'cypher', 
         params: {center: point({latitude: $routeCenterLat, longitude: $routeCenterLon}), radius: $routeRadius}
@@ -246,8 +246,8 @@ class Map extends Component {
       MATCH (b:PointOfInterest) WHERE b.poi_id = $endPOI
       CALL algo.shortestPath.astar.stream(a, b, 'distance', 'lat', 'lon',
         {
-          relationshipQuery: "MATCH (a1:OSMNode)-[r:ROUTE]-(a2:OSMNode) WHERE distance(a1.location,$center) < $radius AND distance(a2.location, $center) < $radius RETURN id(a1) as source, id(a2) as target,r.distance as weight", 
-          nodeQuery:"MATCH (a1:OSMNode) WHERE distance(a1.location, $center) < $radius RETURN id(a1) AS id", 
+          relationshipQuery: "MATCH (a1:Routable)-[r:ROUTE]-(a2:Routable) WHERE distance(a1.location,$center) < $radius AND distance(a2.location, $center) < $radius RETURN id(a1) as source, id(a2) as target,r.distance as weight", 
+          nodeQuery:"MATCH (a1:Routable) WHERE distance(a1.location, $center) < $radius RETURN id(a1) AS id", 
 
           direction:'both', defaultValue:1.0, graph:'cypher', 
           params: {center: point({latitude: $routeCenterLat, longitude: $routeCenterLon}), radius: $routeRadius}
