@@ -108,7 +108,6 @@ class App extends Component {
     value[target.name]=target.type === "checkbox" ? target.checked : target.value;
     var boroughId = value[target.name] ? this.boroughIds[target.name] : 0;
 
-    console.log(target);
     this.setState({
       filterBorough: value,
       boroughId: boroughId
