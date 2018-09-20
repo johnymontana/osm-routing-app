@@ -145,6 +145,7 @@ body.application {
   top: 0px;
   width: 100%;
   z-index: 1;
+  padding-top: 5px;
 }
 
 #app-left-side-panel {
@@ -152,9 +153,25 @@ body.application {
   box-shadow: 0 1px 5px rgba(0,0,0,.1);
   color: #fff;
   position: fixed;
-  top: 100px;
-  width: 10%;
+  top: 80px;
+  width: 15%;
   z-index: 1;
+  padding: 15px 0 10px 20px;
+}
+
+#app-left-side-panel h2 {
+  padding-top: 5pt;
+  padding-bottom: 5pt;
+  font-size: 14pt;
+  font-weight: bold;
+}
+
+#app-left-side-panel input {
+  padding-left: 5pt;
+}
+
+#app-left-side-panel .row {
+  padding-left: 15pt;
 }
 
 #app-toolbar .btn-primary {

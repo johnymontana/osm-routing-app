@@ -28,10 +28,17 @@ class App extends Component {
       endAddress: "",
       pois: [],
       debugMode: false,
-      manhattanOnly: false,
+      filterBorough: {},
+      boroughId: 0,
       routeMode: "shortestpath"
     };
-
+    this.boroughIds = {
+      "manhattan": 8398124,
+      "brooklyn": 369518,
+      "queens": 369519,
+      "bronx": 2552450,
+      "staten": 962876
+    };
     this.driver = neo4j.driver(
       process.env.REACT_APP_NEO4J_URI,
       neo4j.auth.basic(
@@ -97,11 +104,15 @@ class App extends Component {
 
   handleBoroughChange = event => {
     const target = event.target;
-    const value = target.type === "checkbox" ? target.checked : target.value;
+    var value = {};
+    value[target.name]=target.type === "checkbox" ? target.checked : target.value;
+    var boroughId = value[target.name] ? this.boroughIds[target.name] : 0;
 
+    console.log(target);
     this.setState({
-      manhattanOnly: value
-    });
+      filterBorough: value,
+      boroughId: boroughId
+    }, this.fetchBusinesses);
   };
 
   onFocusChange = focusedInput => this.setState({ focusedInput });
@@ -169,9 +180,9 @@ class App extends Component {
 
     let query;
 
-    if (this.state.manhattanOnly) {
-      query = `MATCH (manhattan:OSMRelation) USING INDEX manhattan:OSMRelation(relation_osm_id) WHERE manhattan.relation_osm_id=8398124
-      WITH manhattan.polygon as polygon
+    if (this.state.boroughId) {
+      query = `MATCH (r:OSMRelation) USING INDEX r:OSMRelation(relation_osm_id) WHERE r.relation_osm_id=$boroughId
+      WITH r.polygon as polygon
       MATCH (p:PointOfInterest)
         WHERE distance(p.location, point({latitude: $lat, longitude:$lon})) < ( $radius * 1000)
         AND amanzi.withinPolygon(p.location,polygon)
@@ -186,7 +197,8 @@ class App extends Component {
       .run(query, {
         lat: mapCenter.latitude,
         lon: mapCenter.longitude,
-        radius: mapCenter.radius
+        radius: mapCenter.radius,
+        boroughId: this.state.boroughId
       })
       .then(result => {
         console.log(result);
@@ -276,7 +288,7 @@ class App extends Component {
                     id="radius-value"
                     className="form-control"
                     min="0.1"
-                    max="2.0"
+                    max="5.0"
                     step="0.1"
                     value={this.state.mapCenter.radius}
                     onChange={this.radiusChange}
@@ -356,28 +368,55 @@ class App extends Component {
           </form>
         </div>
         <div id="app-left-side-panel">
-          <h2>Options</h2>
+          <h2>Filter Borough</h2>
 
+            <div className="row">
+                <input
+                    type="checkbox"
+                    name="manhattan"
+                    checked={this.state.filterBorough.manhattan}
+                    onChange={this.handleBoroughChange}
+                />
+                Manhattan
+            </div>
+            <div className="row">
+                <input
+                    type="checkbox"
+                    name="brooklyn"
+                    checked={this.state.filterBorough.brooklyn}
+                    onChange={this.handleBoroughChange}
+                />
+                Brooklyn
+            </div>
+            <div className="row">
+                <input
+                    type="checkbox"
+                    name="queens"
+                    checked={this.state.filterBorough.queens}
+                    onChange={this.handleBoroughChange}
+                />
+                Queens
+            </div>
+            <div className="row">
+                <input
+                    type="checkbox"
+                    name="bronx"
+                    checked={this.state.filterBorough.bronx}
+                    onChange={this.handleBoroughChange}
+                />
+                The Bronx
+            </div>
+            <div className="row">
+                <input
+                    type="checkbox"
+                    name="staten"
+                    checked={this.state.filterBorough.staten}
+                    onChange={this.handleBoroughChange}
+                />
+                Staten Island
+            </div>
+          <h2>Route Algorithm</h2>
           <div className="row">
-            <input
-              type="checkbox"
-              name="debug"
-              checked={this.state.manhattanOnly ? true : false}
-              onChange={this.handleBoroughChange}
-            />
-            Manhattan Only
-          </div>
-          <div className="row">
-            <input
-              type="checkbox"
-              name="debug"
-              checked={this.state.debugMode ? true : false}
-              onChange={this.handleDebugChange}
-            />
-            Debug
-          </div>
-          <div className="row">
-            <h5>Select Algorithm</h5>
             <fieldset>
               <div>
                 <input
@@ -385,9 +424,7 @@ class App extends Component {
                   id="shortestpath"
                   name="shortestpath"
                   value="shortestpath"
-                  checked={
-                    this.state.routeMode == "shortestpath" ? true : false
-                  }
+                  checked={this.state.routeMode === "shortestpath"}
                   onChange={this.handleRouteChange}
                 />
                 <label>Shortest Path</label>
@@ -399,7 +436,7 @@ class App extends Component {
                   id="dijkstra"
                   name="dijkstra"
                   value="dijkstra"
-                  checked={this.state.routeMode == "dijkstra" ? true : false}
+                  checked={this.state.routeMode === "dijkstra"}
                   onChange={this.handleRouteChange}
                 />
                 <label>Dijkstra</label>
@@ -411,12 +448,22 @@ class App extends Component {
                   id="astar"
                   name="astar"
                   value="astar"
-                  checked={this.state.routeMode == "astar" ? true : false}
+                  checked={this.state.routeMode === "astar"}
                   onChange={this.handleRouteChange}
                 />
                 <label>A*</label>
               </div>
             </fieldset>
+          </div>
+          <h2>Options</h2>
+          <div className="row">
+              <input
+                  type="checkbox"
+                  name="debug"
+                  checked={this.state.debugMode}
+                  onChange={this.handleDebugChange}
+              />
+              Debug
           </div>
         </div>
 
