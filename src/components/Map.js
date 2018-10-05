@@ -20,7 +20,46 @@ class Map extends Component {
       features: []
     };
 
-    this.debugIntersection = {
+    this.debugIntersections = {
+      type: "FeatureCollection",
+      features: [
+        {
+          type: "Feature",
+          geometry: {
+            type: "Point",
+            coordinates: []
+          }
+        }
+      ]
+    };
+
+    this.debugRoutable = {
+      type: "FeatureCollection",
+      features: [
+        {
+          type: "Feature",
+          geometry: {
+            type: "Point",
+            coordinates: []
+          }
+        }
+      ]
+    };
+
+    this.debugIntersectionRoutes = {
+      type: "FeatureCollection",
+      features: [
+        {
+          type: "Feature",
+          geometry: {
+            type: "LineString",
+            coordinates: []
+          }
+        }
+      ]
+    };
+
+    this.debugPointsOfInterest = {
       type: "FeatureCollection",
       features: [
         {
@@ -61,22 +100,34 @@ class Map extends Component {
     this.endAddress = this.props.endAddress;
   }
 
-  createDebugIntersection = (lon, lat, radius) => {
+  createDebugIntersections = (lon, lat, radius) => {
     const session = this.props.driver.session();
     const query = `
     MATCH (p:Intersection)
     WHERE distance(p.location, point({latitude: $lat, longitude: $lon})) < $radius * 1000
     MATCH (p)-[r]->(p2:Intersection)
-    RETURN COLLECT({startLat: p.location.latitude, startLon: p.location.longitude, endLat: p2.location.latitude, endLon: p2.location.longitude}) AS debug
+    RETURN COLLECT({startLat: p.location.latitude, startLon: p.location.longitude, endLat: p2.location.latitude, endLon: p2.location.longitude}) AS segments
     `;
     console.log(this);
     session
       .run(query, { lat, lon, radius })
       .then(result => {
         console.log(result);
-        const route = result.records[0].get("debug");
+        const route = result.records[0].get("segments");
 
-        this.debugIntersection.features = route.map(e => {
+        this.debugIntersections.features = route.map(e => {
+          return {
+            type: "Feature",
+            geometry: {
+              type: "Point",
+              coordinates: [e.startLon, e.startLat]
+            }
+          };
+        });
+
+        this.map.getSource("debugIntersections").setData(this.debugIntersections);
+
+        this.debugIntersectionRoutes.features = route.map(e => {
           return {
             type: "Feature",
             geometry: {
@@ -86,7 +137,102 @@ class Map extends Component {
           };
         });
 
-        this.map.getSource("debugIntersection").setData(this.debugIntersection);
+        this.map.getSource("debugIntersectionRoutes").setData(this.debugIntersectionRoutes);
+      })
+      .catch(error => {
+        console.log(error);
+      })
+      .finally(() => {
+        session.close();
+      });
+
+    return {
+      type: "FeatureCollection",
+      features: [
+        {
+          type: "Feature",
+          geometry: {
+            type: "LineString",
+            coordinates: []
+          }
+        }
+      ]
+    };
+  };
+
+  createDebugRoutable = (lon, lat, radius) => {
+    const session = this.props.driver.session();
+    const query = `
+    MATCH (p:Routable)
+    WHERE distance(p.location, point({latitude: $lat, longitude: $lon})) < $radius * 1000
+    RETURN COLLECT([p.location.longitude, p.location.latitude]) AS coordinate
+    `;
+    console.log(this);
+    session
+      .run(query, { lat, lon, radius })
+      .then(result => {
+        console.log(result);
+        const route = result.records[0].get("coordinate");
+
+        this.debugRoutable.features = route.map(e => {
+          return {
+            type: "Feature",
+            geometry: {
+              type: "Point",
+              coordinates: e
+            }
+          };
+        });
+
+        this.map.getSource("debugRoutable").setData(this.debugRoutable);
+      })
+      .catch(error => {
+        console.log(error);
+      })
+      .finally(() => {
+        session.close();
+      });
+
+    return {
+      type: "FeatureCollection",
+      features: [
+        {
+          type: "Feature",
+          geometry: {
+            type: "Point",
+            coordinates: []
+          }
+        }
+      ]
+    };
+  };
+
+  createDebugPointsOfInterest = (lon, lat, radius) => {
+    const session = this.props.driver.session();
+    const query = `
+    MATCH (p:PointOfInterest)
+    WHERE distance(p.location, point({latitude: $lat, longitude: $lon})) < $radius * 1000
+    MATCH (p)-[r:ROUTE]->(p2:Routable)
+    RETURN COLLECT({startLat: p.location.latitude, startLon: p.location.longitude, endLat: p2.location.latitude, endLon: p2.location.longitude}) AS segments
+    `;
+    console.log(this);
+    session
+      .run(query, { lat, lon, radius })
+      .then(result => {
+        console.log(result);
+        const route = result.records[0].get("segments");
+
+        this.debugPointsOfInterest.features = route.map(e => {
+          return {
+            type: "Feature",
+            geometry: {
+              type: "LineString",
+              coordinates: [[e.startLon, e.startLat], [e.endLon, e.endLat]]
+            }
+          };
+        });
+
+        this.map.getSource("debugPointsOfInterest").setData(this.debugPointsOfInterest);
       })
       .catch(error => {
         console.log(error);
@@ -222,7 +368,7 @@ class Map extends Component {
     MATCH (b:PointOfInterest) WHERE b.poi_id = $endPOI
     MATCH p=shortestPath((a)-[:ROUTE*..20]-(b))
     UNWIND nodes(p) AS n
-    RETURN COLLECT({lat: n.location.latitude, lon: n.location.longitude}) AS route
+    RETURN COLLECT([n.location.longitude,n.location.latitude]) AS route
     `;
     } else if (this.props.routeMode === "dijkstra") {
       query = `
@@ -238,7 +384,7 @@ class Map extends Component {
       })
         YIELD nodeId, cost
         MATCH (n) WHERE id(n) = nodeId
-        RETURN COLLECT({lat: n.location.latitude, lon: n.location.longitude}) AS route
+        RETURN COLLECT([n.location.longitude,n.location.latitude]) AS route
       `;
     } else if (this.props.routeMode === "astar") {
       query = `
@@ -253,8 +399,8 @@ class Map extends Component {
           params: {center: point({latitude: $routeCenterLat, longitude: $routeCenterLon}), radius: $routeRadius}
         })
       YIELD nodeId, cost
-      MATCH (route) WHERE id(route) = nodeId
-      RETURN COLLECT({lat: route.location.latitude, lon: route.location.longitude}) AS route
+      MATCH (n) WHERE id(n) = nodeId
+      RETURN COLLECT([n.location.longitude,n.location.latitude]) AS route
       `;
     } else {
       // default query, use if
@@ -263,7 +409,7 @@ class Map extends Component {
     MATCH (b:PointOfInterest) WHERE b.poi_id = $endPOI
     MATCH p=shortestPath((a)-[:ROUTE*..20]-(b))
     UNWIND nodes(p) AS n
-    RETURN COLLECT({lat: n.location.latitude, lon: n.location.longitude}) AS route
+    RETURN COLLECT([n.location.longitude,n.location.latitude]) AS route
     `;
     }
     // `
@@ -277,6 +423,7 @@ class Map extends Component {
     // RETURN COLLECT({lat: osmn.location.latitude, lon: osmn.location.longitude}) AS route
     // `
     console.log(this);
+    console.log(query);
     session
       .run(query, {
         startPOI: this.startPOI,
@@ -287,12 +434,7 @@ class Map extends Component {
       })
       .then(result => {
         console.log(result);
-        const route = result.records[0].get("route");
-
-        this.routeGeojson.features[0].geometry.coordinates = route.map(e => {
-          return [e.lon, e.lat];
-        });
-
+        this.routeGeojson.features[0].geometry.coordinates = result.records[0].get("route");
         this.map.getSource("routeGeojson").setData(this.routeGeojson);
       })
       .catch(error => {
@@ -356,9 +498,24 @@ class Map extends Component {
         data: this.routeGeojson
       });
 
-      this.map.addSource("debugIntersection", {
+      this.map.addSource("debugIntersectionRoutes", {
         type: "geojson",
-        data: this.debugIntersection
+        data: this.debugIntersectionRoutes
+      });
+
+      this.map.addSource("debugIntersections", {
+        type: "geojson",
+        data: this.debugIntersections
+      });
+
+      this.map.addSource("debugRoutable", {
+        type: "geojson",
+        data: this.debugRoutable
+      });
+
+      this.map.addSource("debugPointsOfInterest", {
+        type: "geojson",
+        data: this.debugPointsOfInterest
       });
 
       this.map.addSource("startGeojson", {
@@ -372,14 +529,53 @@ class Map extends Component {
       });
 
       this.map.addLayer({
-        id: "points",
+        id: "debugPointsOfInterest",
+        type: "line",
+        source: "debugPointsOfInterest",
+        layout: {
+          "line-cap": "round",
+          "line-join": "round"
+        },
+        paint: {
+          "line-color": "#0f8",
+          "line-width": 5
+        },
+        filter: ["in", "$type", "LineString"]
+      });
+
+      this.map.addLayer({
+        id: "debugIntersectionRoutes",
+        type: "line",
+        source: "debugIntersectionRoutes",
+        layout: {
+          "line-cap": "round",
+          "line-join": "round"
+        },
+        paint: {
+          "line-color": "#08f",
+          "line-width": 5
+        },
+        filter: ["in", "$type", "LineString"]
+      });
+
+      this.map.addLayer({
+        id: "debugRoutable",
         type: "circle",
-        source: "geojson",
+        source: "debugRoutable",
+        paint: {
+          "circle-radius": 8,
+          "circle-color": "#199"
+        }
+      });
+
+      this.map.addLayer({
+        id: "debugIntersections",
+        type: "circle",
+        source: "debugIntersections",
         paint: {
           "circle-radius": 5,
-          "circle-color": "#000"
-        },
-        filter: ["in", "$type", "Point"]
+          "circle-color": "#044"
+        }
       });
 
       this.map.addLayer({
@@ -387,7 +583,7 @@ class Map extends Component {
         type: "circle",
         source: "startGeojson",
         paint: {
-          "circle-radius": 25,
+          "circle-radius": 12,
           "circle-color": "green"
         }
       });
@@ -397,24 +593,20 @@ class Map extends Component {
         type: "circle",
         source: "endGeojson",
         paint: {
-          "circle-radius": 7,
+          "circle-radius": 12,
           "circle-color": "red"
         }
       });
 
       this.map.addLayer({
-        id: "debug",
-        type: "line",
-        source: "debugIntersection",
-        layout: {
-          "line-cap": "round",
-          "line-join": "round"
-        },
+        id: "points",
+        type: "circle",
+        source: "geojson",
         paint: {
-          "line-color": "black",
-          "line-width": 5
+          "circle-radius": 5,
+          "circle-color": "#000"
         },
-        filter: ["in", "$type", "LineString"]
+        filter: ["in", "$type", "Point"]
       });
 
       this.map.addLayer({
@@ -444,13 +636,19 @@ class Map extends Component {
 
       this.map.on("click", "points", e => {
         console.log(e);
-        console.log(e.features[0].properties.id);
-        const address = e.features[0].properties.name;
-        const name = e.features[0].properties.name;
-        const poi_id = e.features[0].properties.id;
+        console.log("Have " + e.features.length + " features");
+        console.log(e.features[0]);
+        const feature = e.features[0];
+        console.log(feature.properties.id);
+        const address = feature.properties.name;
+        const name = feature.properties.name;
+        const poi_id = feature.properties.id;
+        const coordinates = feature.geometry.coordinates;
         console.log("NAME AND ADDRESS:");
         console.log(name);
         console.log(address);
+        console.log("Location:");
+        console.log(coordinates);
 
         if (this.selectingStart) {
           this.startAddress = name;
@@ -462,7 +660,7 @@ class Map extends Component {
               type: "Feature",
               geometry: {
                 type: "Point",
-                coordinates: e.lngLat
+                coordinates: coordinates
               },
               properties: {
                 title: "",
@@ -484,7 +682,7 @@ class Map extends Component {
               type: "Feature",
               geometry: {
                 type: "Point",
-                coordinates: e.lngLat
+                coordinates: coordinates
               },
               properties: {
                 title: "",
@@ -497,6 +695,7 @@ class Map extends Component {
           ];
 
           this.selectingStart = true;
+          this.map.getSource("endGeojson").setData(this.endGeojson);
           this.props.setEndAddress(name);
           this.fetchRoute();
         }
@@ -527,14 +726,30 @@ class Map extends Component {
         );
 
       if (this.props.debugMode) {
-        this.createDebugIntersection(
+        this.createDebugRoutable(
+          lngLat.lng,
+          lngLat.lat,
+          this.props.mapCenter.radius
+        );
+        this.createDebugIntersections(
+          lngLat.lng,
+          lngLat.lat,
+          this.props.mapCenter.radius
+        );
+        this.createDebugPointsOfInterest(
           lngLat.lng,
           lngLat.lat,
           this.props.mapCenter.radius
         );
       } else {
-        this.debugIntersection.features = [];
-        this.map.getSource("debugIntersection").setData(this.debugIntersection);
+        this.debugRoutable.features = [];
+        this.map.getSource("debugRoutable").setData(this.debugRoutable);
+        this.debugIntersections.features = [];
+        this.map.getSource("debugIntersections").setData(this.debugIntersections);
+        this.debugIntersectionRoutes.features = [];
+        this.map.getSource("debugIntersectionRoutes").setData(this.debugIntersectionRoutes);
+        this.debugPointsOfInterest.features = [];
+        this.map.getSource("debugPointsOfInterest").setData(this.debugPointsOfInterest);
       }
     };
 
