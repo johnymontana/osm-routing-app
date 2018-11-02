@@ -7,7 +7,7 @@ A React app to demonstrate how to use OpenStreetMap data for routing with Neo4j
 * [Mapbox GL JS](https://www.mapbox.com/mapbox-gl-js/api/)
 
 
-![](img/screenshot.gif)
+![](img/routing.gif)
 
 ## Installation 
 
