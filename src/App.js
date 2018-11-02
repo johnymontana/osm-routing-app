@@ -19,8 +19,8 @@ class App extends Component {
       categoryData: [],
       selectedBusiness: false,
       mapCenter: {
-        latitude: 40.7585862,
-        longitude: -73.9858202,
+        latitude: 37.7749,
+        longitude: -122.4194,
         radius: 0.5,
         zoom: 16
       },
