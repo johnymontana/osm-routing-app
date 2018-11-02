@@ -366,7 +366,7 @@ class Map extends Component {
       query = `
     MATCH (a:PointOfInterest) WHERE a.poi_id = $startPOI
     MATCH (b:PointOfInterest) WHERE b.poi_id = $endPOI
-    MATCH p=shortestPath((a)-[:ROUTE*..20]-(b))
+    MATCH p=shortestPath((a)-[:ROUTE*..200]-(b))
     UNWIND nodes(p) AS n
     RETURN COLLECT([n.location.longitude,n.location.latitude]) AS route
     `;
@@ -374,54 +374,30 @@ class Map extends Component {
       query = `
       MATCH (a:PointOfInterest) WHERE a.poi_id = $startPOI
       MATCH (b:PointOfInterest) WHERE b.poi_id = $endPOI
-      CALL algo.shortestPath.stream(a, b, 'distance',
-      {
-        relationshipQuery: "MATCH (a1:Routable)-[r:ROUTE]-(a2:Routable) WHERE distance(a1.location,$center) < $radius AND distance(a2.location, $center) < $radius RETURN id(a1) as source, id(a2) as target,r.distance as weight", 
-        nodeQuery:"MATCH (a1:Routable) WHERE distance(a1.location, $center) < $radius RETURN id(a1) AS id", 
+      CALL apoc.algo.dijkstra(a,b,'ROUTE', 'distance') YIELD path, weight
+      UNWIND nodes(path) AS n
+      RETURN COLLECT([n.location.longitude, n.location.latitude]) AS route
+      `
 
-        direction:'both', defaultValue:1.0, graph:'cypher', 
-        params: {center: point({latitude: $routeCenterLat, longitude: $routeCenterLon}), radius: $routeRadius}
-      })
-        YIELD nodeId, cost
-        MATCH (n) WHERE id(n) = nodeId
-        RETURN COLLECT([n.location.longitude,n.location.latitude]) AS route
-      `;
     } else if (this.props.routeMode === "astar") {
       query = `
       MATCH (a:PointOfInterest) WHERE a.poi_id = $startPOI
       MATCH (b:PointOfInterest) WHERE b.poi_id = $endPOI
-      CALL algo.shortestPath.astar.stream(a, b, 'weight', 'lat', 'lon',
-        {
-          relationshipQuery: "MATCH (a1:Routable)-[r:ROUTE]-(a2:Routable) WHERE distance(a1.location,$center) < $radius AND distance(a2.location, $center) < $radius RETURN id(a1) as source, id(a2) as target,r.distance as weight", 
-          nodeQuery:"MATCH (a1:Routable) WHERE distance(a1.location, $center) < $radius RETURN id(a1) AS id", 
-
-          direction:'both', defaultValue:1.0, graph:'cypher', 
-          params: {center: point({latitude: $routeCenterLat, longitude: $routeCenterLon}), radius: $routeRadius}
-        })
-      YIELD nodeId, cost
-      MATCH (n) WHERE id(n) = nodeId
-      RETURN COLLECT([n.location.longitude,n.location.latitude]) AS route
-      `;
+      CALL apoc.algo.aStar(a, b, 'ROUTE', 'distance', 'lat', 'lon') YIELD path, weight
+      UNWIND nodes(path) AS n
+      RETURN COLLECT([n.location.longitude, n.location.latitude]) AS route
+      `
     } else {
       // default query, use if
       query = `
     MATCH (a:PointOfInterest) WHERE a.poi_id = $startPOI
     MATCH (b:PointOfInterest) WHERE b.poi_id = $endPOI
-    MATCH p=shortestPath((a)-[:ROUTE*..20]-(b))
+    MATCH p=shortestPath((a)-[:ROUTE*..200]-(b))
     UNWIND nodes(p) AS n
     RETURN COLLECT([n.location.longitude,n.location.latitude]) AS route
     `;
     }
-    // `
-    // MATCH p1=(a:Address)-[:CLOSEST]->(:OSMNode)<-[:NODE]-(w1:OSMWayNode)
-    // MATCH p2=(b:Address)-[:CLOSEST]->(:OSMNode)<-[:NODE]-(w2:OSMWayNode)
-    // WHERE a.address = $startAddr AND
-    //       b.address = $endAddr
-    // MATCH route=shortestPath((w1)-[:NEXT*]-(w2) )
-    // UNWIND nodes(route) AS n
-    // MATCH (n)-[:NODE]->(osmn:OSMNode)
-    // RETURN COLLECT({lat: osmn.location.latitude, lon: osmn.location.longitude}) AS route
-    // `
+    
     console.log(this);
     console.log(query);
     session
