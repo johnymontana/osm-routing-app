@@ -298,17 +298,18 @@ class Map extends Component {
   };
 
   geoJSONForPOIs = pois => {
-    return pois.map(b => {
+    return pois.map(poi => {
+      const p = poi.properties;
       return {
         type: "Feature",
         geometry: {
           type: "Point",
-          coordinates: [b.lon, b.lat]
+          coordinates: [p.location.x, p.location.y]
         },
         properties: {
           title: "",
-          id: b.id,
-          name: b.name,
+          id: p.node_osm_id.toString(),
+          name: p.name,
           icon: "monument",
           "marker-color": "#fc4353"
         }
@@ -364,16 +365,16 @@ class Map extends Component {
 
     if (this.props.routeMode === "shortestpath") {
       query = `
-    MATCH (a:PointOfInterest) WHERE a.poi_id = $startPOI
-    MATCH (b:PointOfInterest) WHERE b.poi_id = $endPOI
+    MATCH (a:PointOfInterest) WHERE a.node_osm_id = toInteger($startPOI)
+    MATCH (b:PointOfInterest) WHERE b.node_osm_id = toInteger($endPOI)
     MATCH p=shortestPath((a)-[:ROUTE*..200]-(b))
     UNWIND nodes(p) AS n
     RETURN COLLECT([n.location.longitude,n.location.latitude]) AS route
     `;
     } else if (this.props.routeMode === "dijkstra") {
       query = `
-      MATCH (a:PointOfInterest) WHERE a.poi_id = $startPOI
-      MATCH (b:PointOfInterest) WHERE b.poi_id = $endPOI
+      MATCH (a:PointOfInterest) WHERE a.node_osm_id = toInteger($startPOI)
+      MATCH (b:PointOfInterest) WHERE b.node_osm_id = toInteger($endPOI)
       CALL apoc.algo.dijkstra(a,b,'ROUTE', 'distance') YIELD path, weight
       UNWIND nodes(path) AS n
       RETURN COLLECT([n.location.longitude, n.location.latitude]) AS route
@@ -381,8 +382,8 @@ class Map extends Component {
 
     } else if (this.props.routeMode === "astar") {
       query = `
-      MATCH (a:PointOfInterest) WHERE a.poi_id = $startPOI
-      MATCH (b:PointOfInterest) WHERE b.poi_id = $endPOI
+      MATCH (a:PointOfInterest) WHERE a.node_osm_id = toInteger($startPOI)
+      MATCH (b:PointOfInterest) WHERE b.node_osm_id = toInteger($endPOI)
       CALL apoc.algo.aStar(a, b, 'ROUTE', 'distance', 'lat', 'lon') YIELD path, weight
       UNWIND nodes(path) AS n
       RETURN COLLECT([n.location.longitude, n.location.latitude]) AS route
@@ -390,8 +391,8 @@ class Map extends Component {
     } else {
       // default query, use if
       query = `
-    MATCH (a:PointOfInterest) WHERE a.poi_id = $startPOI
-    MATCH (b:PointOfInterest) WHERE b.poi_id = $endPOI
+    MATCH (a:PointOfInterest) WHERE a.node_osm_id = toInteger($startPOI)
+    MATCH (b:PointOfInterest) WHERE b.node_osm_id = toInteger($endPOI)
     MATCH p=shortestPath((a)-[:ROUTE*..200]-(b))
     UNWIND nodes(p) AS n
     RETURN COLLECT([n.location.longitude,n.location.latitude]) AS route
@@ -618,7 +619,6 @@ class Map extends Component {
         console.log(feature.properties.id);
         const address = feature.properties.name;
         const name = feature.properties.name;
-        const poi_id = feature.properties.id;
         const coordinates = feature.geometry.coordinates;
         console.log("NAME AND ADDRESS:");
         console.log(name);
@@ -628,7 +628,7 @@ class Map extends Component {
 
         if (this.selectingStart) {
           this.startAddress = name;
-          this.startPOI = poi_id;
+          this.startPOI = feature.properties.id;
           this.selectingStart = false;
           this.routeGeojson.features[0].geometry.coordinates = [];
           this.startGeojson.features = [
@@ -652,7 +652,7 @@ class Map extends Component {
           this.props.setStartAddress(name);
         } else {
           this.endAddress = name;
-          this.endPOI = poi_id;
+          this.endPOI = feature.properties.id;
           this.endGeojson.features = [
             {
               type: "Feature",

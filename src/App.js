@@ -185,12 +185,10 @@ class App extends Component {
       MATCH (p:PointOfInterest)
         WHERE distance(p.location, point({latitude: $lat, longitude:$lon})) < ( $radius * 1000)
         AND amanzi.withinPolygon(p.location,polygon)
-      RETURN COLLECT({address: "", name: p.name, lat: p.location.latitude, lon: p.location.longitude, id: p.name + toString(p.location.latitude) + toString(p.location.longitude)}) AS pois
+      RETURN p
       `;
     } else {
-      query = `MATCH (p:PointOfInterest) WHERE distance(p.location, point({latitude: $lat, longitude:$lon})) < ( $radius * 1000)
-         RETURN COLLECT({address: "", name: p.name, lat: p.location.latitude, lon: p.location.longitude, id: p.name + toString(p.location.latitude) + toString(p.location.longitude)}) AS pois
-        `;
+      query = `MATCH (p:PointOfInterest) WHERE distance(p.location, point({latitude: $lat, longitude:$lon})) < ( $radius * 1000) RETURN p`;
     }
     session
       .run(query, {
@@ -201,8 +199,7 @@ class App extends Component {
       })
       .then(result => {
         console.log(result);
-        const record = result.records[0];
-        const pois = record.get("pois");
+        const pois = result.records.map(r => r.get("p"));
 
         this.setState({
           pois
