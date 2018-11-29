@@ -359,6 +359,12 @@ class Map extends Component {
   }
 
   fetchRoute() {
+    if(this.startPOI && this.endPOI) {
+      this.fetchRouteFor(this.startPOI, this.endPOI);
+    }
+  }
+
+  fetchRouteFor(startPOI, endPOI) {
     const session = this.props.driver.session();
 
     let query;
@@ -403,8 +409,8 @@ class Map extends Component {
     console.log(query);
     session
       .run(query, {
-        startPOI: this.startPOI,
-        endPOI: this.endPOI,
+        startPOI: startPOI,
+        endPOI: endPOI,
         routeRadius: this.routeRadius,
         routeCenterLat: this.routeViewport.latitude,
         routeCenterLon: this.routeViewport.longitude
@@ -435,6 +441,7 @@ class Map extends Component {
           ).data
         );
       this.setBusinessMarkers();
+      this.fetchRoute();
     }
   }
 
@@ -678,7 +685,27 @@ class Map extends Component {
       });
     });
 
+    const helpText = i => {
+      if (i < this.props.helpText.length) {
+        return "<div id='popup'>" + this.props.helpText[i] + "</div>";
+      } else {
+        return null;
+      }
+    };
+
     const onDragEnd = e => {
+      if(e.target.getPopup().isOpen()) {
+        if (!e.target['helpLevel']) {
+          e.target['helpLevel'] = 1;
+        }
+        const text = helpText(e.target.helpLevel);
+        if (text) {
+          e.target.getPopup().setHTML(text);
+          e.target.helpLevel++;
+        } else {
+          e.target.togglePopup();
+        }
+      }
       var lngLat = e.target.getLngLat();
 
       const viewport = {
@@ -733,9 +760,7 @@ class Map extends Component {
       .setLngLat([lng, lat])
       .addTo(this.map)
       .setPopup(
-        new mapboxgl.Popup().setText(
-          "Drag me to search for businessees with reviews! Also, try changing the query radius and date range."
-        )
+        new mapboxgl.Popup().setHTML(helpText(0))
       )
       .setDraggable(true)
       .on("dragend", onDragEnd)

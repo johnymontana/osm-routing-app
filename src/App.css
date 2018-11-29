@@ -237,3 +237,9 @@ body.application {
 h5 {
   padding-top:5px;
 }
+
+#popup {
+  font-family: Arial;
+  font-size: 24pt;
+  margin: 10pt;
+}

@@ -1,4 +1,4 @@
-## spacetime-reviews
+## spacetime-routing
 
 A React app to demonstrate how to use OpenStreetMap data for routing with Neo4j
 

@@ -19,14 +19,18 @@ class App extends Component {
       categoryData: [],
       selectedBusiness: false,
       mapCenter: {
-        latitude: 37.7749,
-        longitude: -122.4194,
+        latitude: 37.78755,
+        longitude: -122.40112,
         radius: 0.5,
         zoom: 16
       },
       startAddress: "",
       endAddress: "",
       pois: [],
+      helpText: [
+        "Drag me to search for places of interest to visit!",
+        "Select two places to route between them!"
+      ],
       debugMode: false,
       filterBorough: {},
       boroughId: 0,
@@ -200,10 +204,7 @@ class App extends Component {
       .then(result => {
         console.log(result);
         const pois = result.records.map(r => r.get("p"));
-
-        this.setState({
-          pois
-        });
+        this.setState({ pois });
         session.close();
       })
       .catch(e => {
@@ -477,6 +478,7 @@ class App extends Component {
               driver={this.driver}
               debugMode={this.state.debugMode}
               routeMode={this.state.routeMode}
+              helpText={this.state.helpText}
             />
           </div>
         </div>
