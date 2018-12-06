@@ -37,12 +37,25 @@ class App extends Component {
       regionId: 0,
       routeMode: "shortestpath"
     };
-    this.regions = {
+    this.regionsNY = {
       "manhattan": {"name": "Manhattan", id: 8398124},
       "brooklyn": {"name": "Brooklyn", id: 369518},
       "queens": {"name": "Queens", id: 369519},
       "bronx": {"name": "The Bronx", id: 2552450},
       "staten": {"name": "Staten Island", id: 962876}
+    };
+    this.regions = {
+      "corte_madera": {"name": "Corte Madera", id: 1260313},
+      "mill_valley": {"name": "Mill Valley", id: 112703},
+      "tiburon": {"name": "Tiburon", id: 2829690},
+      "belvedere": {"name": "Belvedere", id: 2829688},
+      "sausalito": {"name": "Sausalito", id: 2829689},
+      "san_francisco": {"name": "San Francisco", id: 111968},
+      "daly_city": {"name": "Daly City", id: 112271},
+      "brisbane": {"name": "Brisbane", id: 2834528},
+      "south_san_francisco": {"name": "South San Francisco", id: 2834558},
+      "hillsborough": {"name": "Hillsborough", id: 112285},
+      "san_mateo": {"name": "San Mateo", id: 2835017}
     };
     this.driver = neo4j.driver(
       process.env.REACT_APP_NEO4J_URI,
@@ -423,7 +436,7 @@ class App extends Component {
           </form>
         </div>
         <div id="app-left-side-panel">
-          <h2>Filter Borough</h2>
+          <h2>Filter Region</h2>
           {this.createRegionCheckboxes()}
           <h2>Route Algorithm</h2>
           <div className="row">
