@@ -315,7 +315,7 @@ class App extends Component {
       let key = keys[i];
       let region = this.regions[key];
       rows.push(
-        <div className="row">
+        <div key={key} className="row">
           <input
             type="checkbox"
             name={key}
