@@ -31,17 +31,18 @@ class App extends Component {
         "Drag me to search for places of interest to visit!",
         "Select two places to route between them!"
       ],
-      debugMode: false,
-      filterBorough: {},
-      boroughId: 0,
+      debugMode: {debugRouting: false, debugPolygons: false},
+      regionPolygons: [],
+      filterRegion: {},
+      regionId: 0,
       routeMode: "shortestpath"
     };
-    this.boroughIds = {
-      "manhattan": 8398124,
-      "brooklyn": 369518,
-      "queens": 369519,
-      "bronx": 2552450,
-      "staten": 962876
+    this.regions = {
+      "manhattan": {"name": "Manhattan", id: 8398124},
+      "brooklyn": {"name": "Brooklyn", id: 369518},
+      "queens": {"name": "Queens", id: 369519},
+      "bronx": {"name": "The Bronx", id: 2552450},
+      "staten": {"name": "Staten Island", id: 962876}
     };
     this.driver = neo4j.driver(
       process.env.REACT_APP_NEO4J_URI,
@@ -99,23 +100,28 @@ class App extends Component {
   handleDebugChange = event => {
     console.log(event);
     const target = event.target;
-    const value = target.type === "checkbox" ? target.checked : target.value;
+    var value = {};
+    value[target.name] = target.type === "checkbox" ? target.checked : target.value;
 
     this.setState({
       debugMode: value
     });
   };
 
-  handleBoroughChange = event => {
+  handleRegionFilterChange = event => {
     const target = event.target;
     var value = {};
-    value[target.name]=target.type === "checkbox" ? target.checked : target.value;
-    var boroughId = value[target.name] ? this.boroughIds[target.name] : 0;
+    value[target.name] = target.type === "checkbox" ? target.checked : target.value;
+    var region = value[target.name] ? this.regions[target.name] : {};
+    var regionId = region["id"] ? region["id"] : 0;
 
     this.setState({
-      filterBorough: value,
-      boroughId: boroughId
-    }, this.fetchBusinesses);
+      filterRegion: value,
+      regionId: regionId
+    }, () => {
+      this.fetchBusinesses();
+      this.fetchSelectedRegion();
+    });
   };
 
   onFocusChange = focusedInput => this.setState({ focusedInput });
@@ -183,8 +189,9 @@ class App extends Component {
 
     let query;
 
-    if (this.state.boroughId) {
-      query = `MATCH (r:OSMRelation) USING INDEX r:OSMRelation(relation_osm_id) WHERE r.relation_osm_id=$boroughId
+    if (this.state.regionId) {
+      query = `MATCH (r:OSMRelation) USING INDEX r:OSMRelation(relation_osm_id)
+        WHERE r.relation_osm_id=$regionId AND exists(r.polygon)
       WITH r.polygon as polygon
       MATCH (p:PointOfInterest)
         WHERE distance(p.location, point({latitude: $lat, longitude:$lon})) < ( $radius * 1000)
@@ -199,7 +206,7 @@ class App extends Component {
         lat: mapCenter.latitude,
         lon: mapCenter.longitude,
         radius: mapCenter.radius,
-        boroughId: this.state.boroughId
+        regionId: this.state.regionId
       })
       .then(result => {
         console.log(result);
@@ -212,6 +219,35 @@ class App extends Component {
         console.log(e);
         session.close();
       });
+  };
+
+  fetchSelectedRegion = () => {
+    const { mapCenter } = this.state;
+    const session = this.driver.session();
+
+    let query;
+
+    if (this.state.regionId && this.state.debugMode.debugPolygons) {
+      query = `MATCH (r:OSMRelation) USING INDEX r:OSMRelation(relation_osm_id)
+        WHERE r.relation_osm_id=$regionId AND exists(r.polygon)
+      RETURN r.polygon as region
+      `;
+      session
+        .run(query, {regionId: this.state.regionId})
+        .then(result => {
+          console.log(result);
+          const regionPolygons = result.records.map(r => r.get("region"));
+          this.setState({regionPolygons});
+          session.close();
+        })
+        .catch(e => {
+          // TODO: handle errors.
+          console.log(e);
+          session.close();
+        });
+    } else {
+      this.setState({regionPolygons: []});
+    }
   };
 
   componentDidUpdate = (prevProps, prevState) => {
@@ -269,6 +305,27 @@ class App extends Component {
         }
       );
     }
+  };
+
+  createRegionCheckboxes = () => {
+    let rows = [];
+    let keys = Object.keys(this.regions);
+    for (let i = 0; i < keys.length; i++) {
+      let key = keys[i];
+      let region = this.regions[key];
+      rows.push(
+        <div className="row">
+          <input
+            type="checkbox"
+            name={key}
+            checked={this.state.filterRegion[key]}
+            onChange={this.handleRegionFilterChange}
+          />
+          {region.name}
+        </div>
+      )
+    }
+    return rows
   };
 
   render() {
@@ -366,52 +423,7 @@ class App extends Component {
         </div>
         <div id="app-left-side-panel">
           <h2>Filter Borough</h2>
-
-            <div className="row">
-                <input
-                    type="checkbox"
-                    name="manhattan"
-                    checked={this.state.filterBorough.manhattan}
-                    onChange={this.handleBoroughChange}
-                />
-                Manhattan
-            </div>
-            <div className="row">
-                <input
-                    type="checkbox"
-                    name="brooklyn"
-                    checked={this.state.filterBorough.brooklyn}
-                    onChange={this.handleBoroughChange}
-                />
-                Brooklyn
-            </div>
-            <div className="row">
-                <input
-                    type="checkbox"
-                    name="queens"
-                    checked={this.state.filterBorough.queens}
-                    onChange={this.handleBoroughChange}
-                />
-                Queens
-            </div>
-            <div className="row">
-                <input
-                    type="checkbox"
-                    name="bronx"
-                    checked={this.state.filterBorough.bronx}
-                    onChange={this.handleBoroughChange}
-                />
-                The Bronx
-            </div>
-            <div className="row">
-                <input
-                    type="checkbox"
-                    name="staten"
-                    checked={this.state.filterBorough.staten}
-                    onChange={this.handleBoroughChange}
-                />
-                Staten Island
-            </div>
+          {this.createRegionCheckboxes()}
           <h2>Route Algorithm</h2>
           <div className="row">
             <fieldset>
@@ -454,13 +466,22 @@ class App extends Component {
           </div>
           <h2>Options</h2>
           <div className="row">
-              <input
-                  type="checkbox"
-                  name="debug"
-                  checked={this.state.debugMode}
-                  onChange={this.handleDebugChange}
-              />
-              Debug
+            <input
+              type="checkbox"
+              name="debugRouting"
+              checked={this.state.debugMode.debugRouting}
+              onChange={this.handleDebugChange}
+            />
+            Debug Routing
+          </div>
+          <div className="row">
+            <input
+              type="checkbox"
+              name="debugPolygons"
+              checked={this.state.debugMode.debugPolygons}
+              onChange={this.handleDebugChange}
+            />
+            Debug Polygons
           </div>
         </div>
 
@@ -470,6 +491,7 @@ class App extends Component {
               mapSearchPointChange={this.mapSearchPointChange}
               mapCenter={this.state.mapCenter}
               businesses={this.state.pois}
+              regions={this.state.regionPolygons}
               businessSelected={this.businessSelected}
               selectedBusiness={this.state.selectedBusiness}
               startMarker={this.state.startMarker}

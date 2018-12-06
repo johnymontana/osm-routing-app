@@ -85,6 +85,19 @@ class Map extends Component {
       ]
     };
 
+    this.regionPolygons = {
+      type: "FeatureCollection",
+      features: [
+        {
+          type: "Feature",
+          geometry: {
+            type: "LineString",
+            coordinates: []
+          }
+        }
+      ]
+    };
+
     this.startGeojson = {
       type: "FeatureCollection",
       features: []
@@ -325,6 +338,19 @@ class Map extends Component {
     // }
   };
 
+  geoJSONForRegions = regionPolygons => {
+    return regionPolygons.map(polygon => {
+      let coordinates = polygon.map(point => [point.x, point.y]);
+      return {
+        type: "Feature",
+        geometry: {
+          type: "LineString",
+          coordinates: coordinates
+        }
+      };
+    });
+  };
+
   businessPopupHTML = business => {
     return `<ul>
     <li>
@@ -356,6 +382,12 @@ class Map extends Component {
     const { businesses } = this.props;
     this.geojson.features = this.geoJSONForPOIs(businesses);
     this.map.getSource("geojson").setData(this.geojson);
+  }
+
+  setRegionPolygons() {
+    const { regions } = this.props;
+    this.regionPolygons.features = this.geoJSONForRegions(regions);
+    this.map.getSource("regionPolygons").setData(this.regionPolygons);
   }
 
   fetchRoute() {
@@ -440,6 +472,7 @@ class Map extends Component {
             this.props.mapCenter.radius
           ).data
         );
+      this.setRegionPolygons();
       this.setBusinessMarkers();
       this.fetchRoute();
     }
@@ -502,6 +535,11 @@ class Map extends Component {
         data: this.debugPointsOfInterest
       });
 
+      this.map.addSource("regionPolygons", {
+        type: "geojson",
+        data: this.regionPolygons
+      });
+
       this.map.addSource("startGeojson", {
         type: "geojson",
         data: this.startGeojson
@@ -560,6 +598,21 @@ class Map extends Component {
           "circle-radius": 5,
           "circle-color": "#044"
         }
+      });
+
+      this.map.addLayer({
+        id: "regionPolygons",
+        type: "line",
+        source: "regionPolygons",
+        layout: {
+          "line-cap": "round",
+          "line-join": "round"
+        },
+        paint: {
+          "line-color": "#038",
+          "line-width": 5
+        },
+        filter: ["in", "$type", "LineString"]
       });
 
       this.map.addLayer({
@@ -728,7 +781,7 @@ class Map extends Component {
           ).data
         );
 
-      if (this.props.debugMode) {
+      if (this.props.debugMode.debugRouting) {
         this.createDebugRoutable(
           lngLat.lng,
           lngLat.lat,
