@@ -194,12 +194,14 @@ class App extends Component {
         WHERE r.relation_osm_id=$regionId AND exists(r.polygon)
       WITH r.polygon as polygon
       MATCH (p:PointOfInterest)
-        WHERE distance(p.location, point({latitude: $lat, longitude:$lon})) < ( $radius * 1000)
+        WHERE distance(p.location, point({latitude: $lat, longitude:$lon})) < ($radius * 1000)
         AND amanzi.withinPolygon(p.location,polygon)
       RETURN p
       `;
     } else {
-      query = `MATCH (p:PointOfInterest) WHERE distance(p.location, point({latitude: $lat, longitude:$lon})) < ( $radius * 1000) RETURN p`;
+      query = `MATCH (p:PointOfInterest)
+        WHERE distance(p.location, point({latitude: $lat, longitude:$lon})) < ($radius * 1000)
+      RETURN p`;
     }
     session
       .run(query, {
@@ -222,16 +224,15 @@ class App extends Component {
   };
 
   fetchSelectedRegion = () => {
-    const { mapCenter } = this.state;
-    const session = this.driver.session();
-
-    let query;
-
     if (this.state.regionId && this.state.debugMode.debugPolygons) {
-      query = `MATCH (r:OSMRelation) USING INDEX r:OSMRelation(relation_osm_id)
+
+      const session = this.driver.session();
+
+      let query = `MATCH (r:OSMRelation) USING INDEX r:OSMRelation(relation_osm_id)
         WHERE r.relation_osm_id=$regionId AND exists(r.polygon)
       RETURN r.polygon as region
       `;
+
       session
         .run(query, {regionId: this.state.regionId})
         .then(result => {
