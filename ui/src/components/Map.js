@@ -85,6 +85,19 @@ class Map extends Component {
       ]
     };
 
+    this.regionPolygons = {
+      type: "FeatureCollection",
+      features: [
+        {
+          type: "Feature",
+          geometry: {
+            type: "LineString",
+            coordinates: []
+          }
+        }
+      ]
+    };
+
     this.startGeojson = {
       type: "FeatureCollection",
       features: []
@@ -298,17 +311,18 @@ class Map extends Component {
   };
 
   geoJSONForPOIs = pois => {
-    return pois.map(b => {
+    return pois.map(poi => {
+      const p = poi.properties;
       return {
         type: "Feature",
         geometry: {
           type: "Point",
-          coordinates: [b.lon, b.lat]
+          coordinates: [p.location.x, p.location.y]
         },
         properties: {
           title: "",
-          id: b.id,
-          name: b.name,
+          id: p.node_osm_id.toString(),
+          name: p.name,
           icon: "monument",
           "marker-color": "#fc4353"
         }
@@ -322,6 +336,19 @@ class Map extends Component {
     //   "text-offset": [0, 0.6],
     //   "text-anchor": "top"
     // }
+  };
+
+  geoJSONForRegions = regionPolygons => {
+    return regionPolygons.map(polygon => {
+      let coordinates = polygon.map(point => [point.x, point.y]);
+      return {
+        type: "Feature",
+        geometry: {
+          type: "LineString",
+          coordinates: coordinates
+        }
+      };
+    });
   };
 
   businessPopupHTML = business => {
@@ -357,23 +384,35 @@ class Map extends Component {
     this.map.getSource("geojson").setData(this.geojson);
   }
 
+  setRegionPolygons() {
+    const { regions } = this.props;
+    this.regionPolygons.features = this.geoJSONForRegions(regions);
+    this.map.getSource("regionPolygons").setData(this.regionPolygons);
+  }
+
   fetchRoute() {
+    if(this.startPOI && this.endPOI) {
+      this.fetchRouteFor(this.startPOI, this.endPOI);
+    }
+  }
+
+  fetchRouteFor(startPOI, endPOI) {
     const session = this.props.driver.session();
 
     let query;
 
     if (this.props.routeMode === "shortestpath") {
       query = `
-    MATCH (a:PointOfInterest) WHERE a.poi_id = $startPOI
-    MATCH (b:PointOfInterest) WHERE b.poi_id = $endPOI
+    MATCH (a:PointOfInterest) WHERE a.node_osm_id = toInteger($startPOI)
+    MATCH (b:PointOfInterest) WHERE b.node_osm_id = toInteger($endPOI)
     MATCH p=shortestPath((a)-[:ROUTE*..200]-(b))
     UNWIND nodes(p) AS n
     RETURN COLLECT([n.location.longitude,n.location.latitude]) AS route
     `;
     } else if (this.props.routeMode === "dijkstra") {
       query = `
-      MATCH (a:PointOfInterest) WHERE a.poi_id = $startPOI
-      MATCH (b:PointOfInterest) WHERE b.poi_id = $endPOI
+      MATCH (a:PointOfInterest) WHERE a.node_osm_id = toInteger($startPOI)
+      MATCH (b:PointOfInterest) WHERE b.node_osm_id = toInteger($endPOI)
       CALL apoc.algo.dijkstra(a,b,'ROUTE', 'distance') YIELD path, weight
       UNWIND nodes(path) AS n
       RETURN COLLECT([n.location.longitude, n.location.latitude]) AS route
@@ -381,8 +420,8 @@ class Map extends Component {
 
     } else if (this.props.routeMode === "astar") {
       query = `
-      MATCH (a:PointOfInterest) WHERE a.poi_id = $startPOI
-      MATCH (b:PointOfInterest) WHERE b.poi_id = $endPOI
+      MATCH (a:PointOfInterest) WHERE a.node_osm_id = toInteger($startPOI)
+      MATCH (b:PointOfInterest) WHERE b.node_osm_id = toInteger($endPOI)
       CALL apoc.algo.aStar(a, b, 'ROUTE', 'distance', 'lat', 'lon') YIELD path, weight
       UNWIND nodes(path) AS n
       RETURN COLLECT([n.location.longitude, n.location.latitude]) AS route
@@ -390,8 +429,8 @@ class Map extends Component {
     } else {
       // default query, use if
       query = `
-    MATCH (a:PointOfInterest) WHERE a.poi_id = $startPOI
-    MATCH (b:PointOfInterest) WHERE b.poi_id = $endPOI
+    MATCH (a:PointOfInterest) WHERE a.node_osm_id = toInteger($startPOI)
+    MATCH (b:PointOfInterest) WHERE b.node_osm_id = toInteger($endPOI)
     MATCH p=shortestPath((a)-[:ROUTE*..200]-(b))
     UNWIND nodes(p) AS n
     RETURN COLLECT([n.location.longitude,n.location.latitude]) AS route
@@ -402,8 +441,8 @@ class Map extends Component {
     console.log(query);
     session
       .run(query, {
-        startPOI: this.startPOI,
-        endPOI: this.endPOI,
+        startPOI: startPOI,
+        endPOI: endPOI,
         routeRadius: this.routeRadius,
         routeCenterLat: this.routeViewport.latitude,
         routeCenterLon: this.routeViewport.longitude
@@ -433,7 +472,9 @@ class Map extends Component {
             this.props.mapCenter.radius
           ).data
         );
+      this.setRegionPolygons();
       this.setBusinessMarkers();
+      this.fetchRoute();
     }
   }
 
@@ -494,6 +535,11 @@ class Map extends Component {
         data: this.debugPointsOfInterest
       });
 
+      this.map.addSource("regionPolygons", {
+        type: "geojson",
+        data: this.regionPolygons
+      });
+
       this.map.addSource("startGeojson", {
         type: "geojson",
         data: this.startGeojson
@@ -552,6 +598,21 @@ class Map extends Component {
           "circle-radius": 5,
           "circle-color": "#044"
         }
+      });
+
+      this.map.addLayer({
+        id: "regionPolygons",
+        type: "line",
+        source: "regionPolygons",
+        layout: {
+          "line-cap": "round",
+          "line-join": "round"
+        },
+        paint: {
+          "line-color": "#038",
+          "line-width": 5
+        },
+        filter: ["in", "$type", "LineString"]
       });
 
       this.map.addLayer({
@@ -618,7 +679,6 @@ class Map extends Component {
         console.log(feature.properties.id);
         const address = feature.properties.name;
         const name = feature.properties.name;
-        const poi_id = feature.properties.id;
         const coordinates = feature.geometry.coordinates;
         console.log("NAME AND ADDRESS:");
         console.log(name);
@@ -628,7 +688,7 @@ class Map extends Component {
 
         if (this.selectingStart) {
           this.startAddress = name;
-          this.startPOI = poi_id;
+          this.startPOI = feature.properties.id;
           this.selectingStart = false;
           this.routeGeojson.features[0].geometry.coordinates = [];
           this.startGeojson.features = [
@@ -652,7 +712,7 @@ class Map extends Component {
           this.props.setStartAddress(name);
         } else {
           this.endAddress = name;
-          this.endPOI = poi_id;
+          this.endPOI = feature.properties.id;
           this.endGeojson.features = [
             {
               type: "Feature",
@@ -678,7 +738,27 @@ class Map extends Component {
       });
     });
 
+    const helpText = i => {
+      if (i < this.props.helpText.length) {
+        return "<div id='popup'>" + this.props.helpText[i] + "</div>";
+      } else {
+        return null;
+      }
+    };
+
     const onDragEnd = e => {
+      if(e.target.getPopup().isOpen()) {
+        if (!e.target['helpLevel']) {
+          e.target['helpLevel'] = 1;
+        }
+        const text = helpText(e.target.helpLevel);
+        if (text) {
+          e.target.getPopup().setHTML(text);
+          e.target.helpLevel++;
+        } else {
+          e.target.togglePopup();
+        }
+      }
       var lngLat = e.target.getLngLat();
 
       const viewport = {
@@ -701,7 +781,7 @@ class Map extends Component {
           ).data
         );
 
-      if (this.props.debugMode) {
+      if (this.props.debugMode.debugRouting) {
         this.createDebugRoutable(
           lngLat.lng,
           lngLat.lat,
@@ -733,9 +813,7 @@ class Map extends Component {
       .setLngLat([lng, lat])
       .addTo(this.map)
       .setPopup(
-        new mapboxgl.Popup().setText(
-          "Drag me to search for businessees with reviews! Also, try changing the query radius and date range."
-        )
+        new mapboxgl.Popup().setHTML(helpText(0))
       )
       .setDraggable(true)
       .on("dragend", onDragEnd)

@@ -3,13 +3,27 @@
 Demonstrating routing with path finding algorithms using Neo4j graph database and data from OpenStreetMap.
 
 * [create-react-app](https://github.com/facebook/create-react-app)
+* [neo4j-javascript-driver](https://github.com/neo4j/neo4j-javascript-driver)
 * [neo4j-graphql.js](https://grandstack.io/docs/neo4j-graphql-js.html)
 * [Mapbox GL JS](https://www.mapbox.com/mapbox-gl-js/api/)
 
 
 ![](img/routing.gif)
 
-## Overview
+## Installation 
+
+Set environment variables:
+
+```
+REACT_APP_NEO4J_URI=XXX
+REACT_APP_NEO4J_USER=XXX
+REACT_APP_NEO4J_PASSWORD=XXX
+REACT_APP_MAPBOX_TOKEN=XXX
+```
+
+these can be added to `.env`
+
+Clone this git repo, and then
 
 This project is composed of a simple React web app and a GraphQL API created using neo4j-graphql.js. In addition, a Neo4j database with OpenStreetMap data is required.
 
