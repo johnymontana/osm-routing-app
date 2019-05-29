@@ -23,8 +23,8 @@
     "graphql-tag": "^2.9.2",
     "graphql-tools": "4.0.0",
     "husky": "^0.14.3",
-    "neo4j-driver": "^1.6.1",
-    "neo4j-graphql-js": "^1.0.1",
+    "neo4j-driver": "^1.7.5",
+    "neo4j-graphql-js": "^2.6.2",
     "node-fetch": "^2.1.2"
   },
   "devDependencies": {

@@ -10,7 +10,7 @@ type PointOfInterest {
   lon: Float
   location: Point
   poi_id: String
-  shortestPathRouteToPOI(poi_id: String): [LatLng] @cypher(statement: """
+  shortestPathRouteToPOI(poi_id: String!): [LatLng] @cypher(statement: """
     MATCH (b:PointOfInterest) WHERE b.poi_id = $poi_id
     MATCH p=shortestPath((this)-[:ROUTE*..200]-(b))
     UNWIND nodes(p) AS n
