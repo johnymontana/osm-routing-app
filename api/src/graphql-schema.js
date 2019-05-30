@@ -1,7 +1,14 @@
 
-export const typeDefs = `
+export const typeDefs = /* GraphQL */ `
 
 scalar Point
+
+type LineSegment {
+  startLat: Float
+  endLat: Float
+  startLon: Float
+  endLon: Float
+}
 
 type PointOfInterest {
   node_osm_id: Int!
@@ -40,6 +47,16 @@ type Query {
   MATCH (p:PointOfInterest) 
   WHERE distance(p.location, point({latitude: $lat, longitude:$lon})) < ( $radius * 1000)
   RETURN p
+  """)
+
+  unwalkedPaths: [LineSegment] @cypher(statement: """
+  MATCH (p:Intersection)
+  WITH p LIMIT 100
+  MATCH (p)-[r]->(p2:Intersection)
+  RETURN {startLat: p.location.latitude, 
+    startLon: p.location.longitude, 
+    endLat: p2.location.latitude, 
+    endLon: p2.location.longitude} AS segments
   """)
 }
 `;
