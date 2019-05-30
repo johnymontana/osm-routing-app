@@ -51,8 +51,20 @@ type Query {
 
   unwalkedPaths: [LineSegment] @cypher(statement: """
   MATCH (p:Intersection)
+  WHERE NOT 'Walked' IN labels(p)
   WITH p LIMIT 100
   MATCH (p)-[r]->(p2:Intersection)
+  WHERE NOT 'Walked' IN labels(p2)
+  RETURN {startLat: p.location.latitude, 
+    startLon: p.location.longitude, 
+    endLat: p2.location.latitude, 
+    endLon: p2.location.longitude} AS segments
+  """)
+
+  walkedPaths: [LineSegment] @cypher(statement: """
+  MATCH (p:Walked)
+  WITH p LIMIT 100
+  MATCH (p)-[r]->(p2:Walked)
   RETURN {startLat: p.location.latitude, 
     startLon: p.location.longitude, 
     endLat: p2.location.latitude, 
