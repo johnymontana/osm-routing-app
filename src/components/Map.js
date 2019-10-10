@@ -91,7 +91,33 @@ class Map extends Component {
         {
           type: "Feature",
           geometry: {
+            type: "Polygon",
+            coordinates: [[]]
+          }
+        }
+      ]
+    };
+
+    this.regionDistances = {
+      type: "FeatureCollection",
+      features: [
+        {
+          type: "Feature",
+          geometry: {
             type: "LineString",
+            coordinates: []
+          }
+        }
+      ]
+    };
+
+    this.regionAreas = {
+      type: "FeatureCollection",
+      features: [
+        {
+          type: "Feature",
+          geometry: {
+            type: "Point",
             coordinates: []
           }
         }
@@ -338,14 +364,52 @@ class Map extends Component {
     // }
   };
 
-  geoJSONForRegions = regionPolygons => {
+  geoJSONForRegionPolygons = regionPolygons => {
+    if (regionPolygons.length > 0) console.log("Generating JSON for " + regionPolygons.length + " regionPolygons: ");
     return regionPolygons.map(polygon => {
       let coordinates = polygon.map(point => [point.x, point.y]);
       return {
         type: "Feature",
         geometry: {
+          type: "Polygon",
+          coordinates: [coordinates]
+        }
+      };
+    });
+  };
+
+  geoJSONForRegionDistances = regionDistances => {
+    if (regionDistances.length > 0) console.log("Generating JSON for " + regionDistances.length + " regionDistances: ");
+    return regionDistances.map(distanceObject => {
+      let startCoord = [distanceObject.start.x, distanceObject.start.y];
+      let endCoord = [distanceObject.end.x, distanceObject.end.y];
+      return {
+        type: "Feature",
+        geometry: {
           type: "LineString",
-          coordinates: coordinates
+          coordinates: [startCoord, endCoord]
+        }
+      };
+    });
+  };
+
+  geoJSONForRegionAreas = regionAreas => {
+    if (regionAreas.length > 0) console.log("Generating JSON for " + regionAreas.length + " regionAreas: ");
+    return regionAreas.map(areaObject => {
+      console.log(areaObject);
+      const area = (areaObject.area / 1000000).toFixed(0).toString();
+      return {
+        type: "Feature",
+        geometry: {
+          type: "Point",
+          coordinates: [areaObject.x, areaObject.y]
+        },
+        properties: {
+          title: "",
+          name: areaObject.area,
+          description: areaObject.name + ": " + area,
+          id: areaObject.regionId,
+          "marker-color": "#fc4353"
         }
       };
     });
@@ -379,15 +443,27 @@ class Map extends Component {
   }
 
   setBusinessMarkers() {
-    const { businesses } = this.props;
+    const {businesses} = this.props;
     this.geojson.features = this.geoJSONForPOIs(businesses);
     this.map.getSource("geojson").setData(this.geojson);
   }
 
   setRegionPolygons() {
-    const { regions } = this.props;
-    this.regionPolygons.features = this.geoJSONForRegions(regions);
+    const {regionPolygons} = this.props;
+    this.regionPolygons.features = this.geoJSONForRegionPolygons(regionPolygons);
     this.map.getSource("regionPolygons").setData(this.regionPolygons);
+  }
+
+  setRegionDistances() {
+    const {regionDistances} = this.props;
+    this.regionDistances.features = this.geoJSONForRegionDistances(regionDistances);
+    this.map.getSource("regionDistances").setData(this.regionDistances);
+  }
+
+  setRegionAreas() {
+    const {regionAreas} = this.props;
+    this.regionAreas.features = this.geoJSONForRegionAreas(regionAreas);
+    this.map.getSource("regionAreas").setData(this.regionAreas);
   }
 
   fetchRoute() {
@@ -473,6 +549,8 @@ class Map extends Component {
           ).data
         );
       this.setRegionPolygons();
+      this.setRegionDistances();
+      this.setRegionAreas();
       this.setBusinessMarkers();
       this.fetchRoute();
     }
@@ -540,6 +618,16 @@ class Map extends Component {
         data: this.regionPolygons
       });
 
+      this.map.addSource("regionDistances", {
+        type: "geojson",
+        data: this.regionDistances
+      });
+
+      this.map.addSource("regionAreas", {
+        type: "geojson",
+        data: this.regionAreas
+      });
+
       this.map.addSource("startGeojson", {
         type: "geojson",
         data: this.startGeojson
@@ -602,17 +690,42 @@ class Map extends Component {
 
       this.map.addLayer({
         id: "regionPolygons",
-        type: "line",
+        type: "fill",
         source: "regionPolygons",
+        layout: {
+        },
+        paint: {
+          "fill-outline-color": "#038",
+          "fill-color": "#03F",
+          "fill-opacity": 0.3
+        }
+      });
+
+      this.map.addLayer({
+        id: "regionDistances",
+        type: "line",
+        source: "regionDistances",
         layout: {
           "line-cap": "round",
           "line-join": "round"
         },
         paint: {
-          "line-color": "#038",
+          "line-color": "#55f",
           "line-width": 5
         },
         filter: ["in", "$type", "LineString"]
+      });
+
+      this.map.addLayer({
+        id: "regionAreas",
+        type: "symbol",
+        source: "regionAreas",
+        layout: {
+          "text-field": ["get", "description"],
+          "text-size": 24,
+          "icon-image": ["concat", ["get", "icon"], "-15"]
+        },
+        filter: ["in", "$type", "Point"]
       });
 
       this.map.addLayer({
@@ -669,6 +782,21 @@ class Map extends Component {
         this.map.getCanvas().style.cursor = features.length
           ? "pointer"
           : "crosshair";
+      });
+
+      this.map.on("click", e => {
+        console.log("Mouse clicked");
+        console.log(e);
+        if(e.lngLat) {
+          const point = {
+            latitude: e.lngLat.lat,
+            longitude: e.lngLat.lng,
+          };
+          console.log(point);
+          this.props.toggleRegionSelected(point);
+        }else{
+          console.log("No lat/lng in mouse event");
+        }
       });
 
       this.map.on("click", "points", e => {

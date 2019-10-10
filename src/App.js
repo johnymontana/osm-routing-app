@@ -1,4 +1,4 @@
-import React, { Component } from "react";
+import React, {Component} from "react";
 import "./App.css";
 import Map from "./components/Map";
 import neo4j from "neo4j-driver/lib/browser/neo4j-web";
@@ -19,10 +19,10 @@ class App extends Component {
       categoryData: [],
       selectedBusiness: false,
       mapCenter: {
-        latitude: 37.78755,
-        longitude: -122.40112,
+        latitude: 56.0,
+        longitude: 13.0,
         radius: 0.5,
-        zoom: 16
+        zoom: 10
       },
       startAddress: "",
       endAddress: "",
@@ -31,10 +31,12 @@ class App extends Component {
         "Drag me to search for places of interest to visit!",
         "Select two places to route between them!"
       ],
-      debugMode: {debugRouting: false, debugPolygons: false},
+      debugMode: {debugRouting: false, debugPolygons: false, debugAreas: false, debugDistances: false, convexHull: false},
       regionPolygons: [],
+      regionDistances: [],
+      regionAreas: [],
       filterRegion: {},
-      regionId: 0,
+      regionIds: [],
       routeMode: "shortestpath"
     };
     this.regionsNY = {
@@ -44,7 +46,7 @@ class App extends Component {
       "bronx": {"name": "The Bronx", id: 2552450},
       "staten": {"name": "Staten Island", id: 962876}
     };
-    this.regions = {
+    this.regionsSF = {
       "corte_madera": {"name": "Corte Madera", id: 1260313},
       "mill_valley": {"name": "Mill Valley", id: 112703},
       "tiburon": {"name": "Tiburon", id: 2829690},
@@ -57,6 +59,35 @@ class App extends Component {
       "hillsborough": {"name": "Hillsborough", id: 112285},
       "san_mateo": {"name": "San Mateo", id: 2835017}
     };
+    this.regions = {
+      "Sweden": {"name": "Sweden", id: 4116216},
+      "Blekinge": {"name": "Blekinge län", id: 54413},
+      "Dalarnas": {"name": "Dalarnas län", id: 52834},
+      "Gotlands": {"name": "Gotlands län", id: 941530},
+      "Gävleborgs": {"name": "Gävleborgs län", id: 52832},
+      "Hallands": {"name": "Hallands län", id: 54403},
+      "Jämtlands": {"name": "Jämtlands län", id: 52826},
+      "Jönköpings": {"name": "Jönköpings län", id: 54374},
+      "Kalmar": {"name": "Kalmar län", id: 54417},
+      "Kronobergs": {"name": "Kronobergs län", id: 54412},
+      "Norrbottens": {"name": "Norrbottens län", id: 52824},
+      "Skanör": {"name": "Skanör med Falsterbo", id: 43332835, isWay: true},
+      "Skåne": {"name": "Skåne län", id: 54409},
+      "Skåne (land)": {"name": "Skåne län (land)", id: 4473774},
+      "Småland": {"name": "Småland län", id: 9691220},
+      "Stockholms": {"name": "Stockholms län", id: 54391},
+      "Södermanlands": {"name": "Södermanlands län", id: 54386},
+      "Uppsala": {"name": "Uppsala län", id: 54220},
+      "Ven": {"name": "Ven (island)", id: 3172367},
+      "Värmlands": {"name": "Värmlands län", id: 54223},
+      "Västerbottens": {"name": "Västerbottens län", id: 52825},
+      "Västernorrlands": {"name": "Västernorrlands län", id: 52827},
+      "Västmanlands": {"name": "Västmanlands län", id: 54221},
+      "Västra Götalands": {"name": "Västra Götalands län", id: 54367},
+      "Örebro": {"name": "Örebro län", id: 54222},
+      "Östergötlands": {"name": "Östergötlands län", id: 940675}
+    };
+    this.regionsById = this.makeRegionsById();
     this.driver = neo4j.driver(
       process.env.REACT_APP_NEO4J_URI,
       neo4j.auth.basic(
@@ -65,8 +96,38 @@ class App extends Component {
       ),
       { encrypted: false }
     );
+    this.regionDistancesSession = null;
     this.fetchBusinesses();
   }
+
+  toggleRegionSelected = point => {
+    console.log("Event to find regions at: " + point);
+    const session = this.driver.session();
+
+    let query = `
+      WITH point($location) AS location
+      MATCH (r:OSMRelation)-[:POLYGON_STRUCTURE*]->(p)
+        WHERE exists(p.polygon)
+        AND spatial.algo.withinPolygon(location,p.polygon)
+      RETURN r.relation_osm_id AS id`;
+    session
+        .run(query, {
+          location: point
+        })
+        .then(result => {
+          console.log(result);
+          const region_ids = result.records.map(r => r.get("id").toNumber());
+          // this.setState({pois});
+          session.close();
+          let elements = this.findRegions(region_ids);
+          elements.forEach(element => this.updateRegionSelection(element));
+        })
+        .catch(e => {
+          // TODO: handle errors.
+          console.log(e);
+          session.close();
+        });
+  };
 
   setStartAddress = startAddress => {
     this.setState({
@@ -113,27 +174,51 @@ class App extends Component {
   handleDebugChange = event => {
     console.log(event);
     const target = event.target;
-    var value = {};
+    var value = this.state.debugMode;
     value[target.name] = target.type === "checkbox" ? target.checked : target.value;
 
     this.setState({
       debugMode: value
+    }, () => {
+      this.fetchSelectedRegions();
+      this.fetchRegionAreas();
+      this.fetchRegionDistances();
     });
   };
 
   handleRegionFilterChange = event => {
     const target = event.target;
-    var value = {};
-    value[target.name] = target.type === "checkbox" ? target.checked : target.value;
-    var region = value[target.name] ? this.regions[target.name] : {};
-    var regionId = region["id"] ? region["id"] : 0;
+    this.updateRegionSelection(target);
+  };
+
+  updateRegionSelection = target => {
+    console.log("Updating input element");
+    console.log(target);
+    let filterRegion = this.state.filterRegion;
+    let regionIds = this.state.regionIds;
+    if(this.regions[target.name]) {
+      let regionId = this.regions[target.name]["id"];
+      if (target.type === "checkbox" && target.checked) {
+        if (!regionIds.includes(regionId)) {
+          regionIds.push(regionId);
+        }
+        filterRegion[target.name] = true;
+      } else {
+        regionIds = regionIds.filter(e => e !== regionId);
+        filterRegion[target.name] = false;
+      }
+    }else{
+      console.log(`No such region: ${target.name}`);
+    }
 
     this.setState({
-      filterRegion: value,
-      regionId: regionId
+      filterRegion: filterRegion,
+      regionIds: regionIds
     }, () => {
       this.fetchBusinesses();
-      this.fetchSelectedRegion();
+      this.fetchSelectedRegions();
+      this.fetchRegionAreas();
+      this.fetchRegionDistances();
     });
   };
 
@@ -202,13 +287,13 @@ class App extends Component {
 
     let query;
 
-    if (this.state.regionId) {
+    if (this.state.regionIds) {
       query = `MATCH (r:OSMRelation) USING INDEX r:OSMRelation(relation_osm_id)
-        WHERE r.relation_osm_id=$regionId AND exists(r.polygon)
+        WHERE r.relation_osm_id IN $regionIds AND exists(r.polygon)
       WITH r.polygon as polygon
       MATCH (p:PointOfInterest)
         WHERE distance(p.location, point({latitude: $lat, longitude:$lon})) < ($radius * 1000)
-        AND amanzi.withinPolygon(p.location,polygon)
+        AND spatial.algo.withinPolygon(p.location,polygon)
       RETURN p
       `;
     } else {
@@ -221,7 +306,7 @@ class App extends Component {
         lat: mapCenter.latitude,
         lon: mapCenter.longitude,
         radius: mapCenter.radius,
-        regionId: this.state.regionId
+        regionIds: this.state.regionIds
       })
       .then(result => {
         console.log(result);
@@ -236,31 +321,164 @@ class App extends Component {
       });
   };
 
-  fetchSelectedRegion = () => {
-    if (this.state.regionId && this.state.debugMode.debugPolygons) {
+  fetchSelectedRegions = () => {
+    if (this.state.regionIds && this.state.debugMode.debugPolygons) {
 
       const session = this.driver.session();
 
-      let query = `MATCH (r:OSMRelation) USING INDEX r:OSMRelation(relation_osm_id)
-        WHERE r.relation_osm_id=$regionId AND exists(r.polygon)
-      RETURN r.polygon as region
+      let queryResult = this.state.debugMode.convexHull ? "spatial.algo.convexHull(p.polygon)" : "p.polygon";
+      let query = `MATCH (r:OSMRelation)-[:POLYGON_STRUCTURE*]->(p) USING INDEX r:OSMRelation(relation_osm_id)
+        WHERE r.relation_osm_id IN $regionIds AND exists(p.polygon)
+      RETURN r.relation_osm_id AS region_id, ${queryResult} as region
       `;
+      console.log(query);
 
       session
-        .run(query, {regionId: this.state.regionId})
-        .then(result => {
-          console.log(result);
-          const regionPolygons = result.records.map(r => r.get("region"));
-          this.setState({regionPolygons});
-          session.close();
-        })
-        .catch(e => {
-          // TODO: handle errors.
-          console.log(e);
-          session.close();
-        });
+          .run(query, {regionIds: this.state.regionIds})
+          .then(result => {
+            console.log(result);
+            const regionPolygons = result.records.map(r => {
+              let region_id = r.get("region_id");
+              let polygon = r.get("region");
+              let regionMap = this.regionsById[region_id];
+              if (regionMap && !regionMap.location) {
+                regionMap.location = this.averageLocation(polygon);
+              }
+              return polygon;
+            });
+            this.setState({regionPolygons});
+            session.close();
+          })
+          .catch(e => {
+            // TODO: handle errors.
+            console.log(e);
+            session.close();
+          });
     } else {
       this.setState({regionPolygons: []});
+    }
+  };
+
+  averageLocation = (points) => {
+    var size = points.length;
+    if (size < 1) size = 1;
+    var x = 0.0;
+    var y = 0.0;
+    points.forEach(p => {
+      x = x + p.x;
+      y = y + p.y;
+    });
+    return {x: x / size, y: y / size};
+  };
+
+  fetchRegionDistances = () => {
+    if (this.state.regionIds.length > 1 && this.state.debugMode.debugDistances) {
+
+      if (this.regionDistancesSession) {
+        console.log("Previous query for regionDistances running, terminating to make space for a new query");
+        this.setState({regionDistances: []});
+        this.regionDistancesSession.close();
+      }
+      this.regionDistancesSession = this.driver.session();
+
+      let pairs = [];
+      for (let i = 0; i < this.state.regionIds.length; i++) {
+        let a = this.state.regionIds[i];
+        for (let j = i + 1; j < this.state.regionIds.length; j++) {
+          let b = this.state.regionIds[j];
+          pairs.push([a, b]);
+        }
+      }
+
+      let query = `
+      UNWIND $pairs AS pair
+      MATCH (r1:OSMRelation)-[:POLYGON_STRUCTURE*]->(p1) USING INDEX r1:OSMRelation(relation_osm_id)
+        WHERE r1.relation_osm_id=pair[0] AND exists(p1.polygon)
+      OPTIONAL MATCH (r2:OSMRelation)-[:POLYGON_STRUCTURE*]->(p2) USING INDEX r2:OSMRelation(relation_osm_id)
+        WHERE r2.relation_osm_id=pair[1] AND exists(p2.polygon)
+      RETURN pair, spatial.algo.distance.ends(p1.polygon, p2.polygon) AS distance
+      `;
+      console.log(query);
+
+      this.regionDistancesSession
+          .run(query, {pairs: pairs})
+          .then(result => {
+            console.log("Got distances:");
+            console.log(result);
+            const regionDistances = result.records.map(r => [r.get("pair"), r.get("distance")]).filter(data => {
+              const pair = data[0];
+              const d = data[1];
+              if (d.message) console.log("Distance[" + pair + "] message: " + d.message);
+              if (d.error) console.log("Distance[" + pair + "] error: " + d.error);
+              return (d.start && d.end);
+            }).map(data => data[1]);
+            this.setState({regionDistances});
+            if (!this.regionDistancesSession) {
+              this.regionDistancesSession.close();
+              this.regionDistancesSession = null;
+            }
+          })
+          .catch(e => {
+            // TODO: handle errors.
+            if (!this.regionDistancesSession) {
+              this.regionDistancesSession.close();
+              this.regionDistancesSession = null;
+              console.log(e);
+            } else {
+              // The error is likely due to cancelling the query (due to new one comming in), so we simply log that fact, not the entire error
+              console.log("Query for regionDistances cancelled by new event asking for regionDistances, server gave error: " + e.toString());
+            }
+          });
+    } else {
+      this.setState({regionDistances: []});
+    }
+  };
+
+  fetchRegionAreas = () => {
+    if (this.state.regionIds.length && this.state.debugMode.debugAreas) {
+
+      const session = this.driver.session();
+
+      let query = `
+      MATCH (r:OSMRelation)-[:POLYGON_STRUCTURE*]->(p) USING INDEX r:OSMRelation(relation_osm_id)
+        WHERE r.relation_osm_id IN $regionIds AND exists(p.polygon)
+      RETURN r.relation_osm_id AS region_id, spatial.algo.area(p.polygon) AS area
+      `;
+      console.log(query);
+      let x = 13.5;
+      let y = 56.5;
+
+      session
+          .run(query, {regionIds: this.state.regionIds})
+          .then(result => {
+            console.log("Got areas:");
+            console.log(result);
+            const regionAreas = result.records.map(r => [r.get("region_id"), r.get("area")]).filter(data => {
+              const area = data[1];
+              return area > 0;
+            }).map(data => {
+              const region_id = data[0];
+              const area = data[1];
+              const regionMap = this.regionsById[region_id];
+              if (regionMap.location) {
+                return {x: regionMap.location.x, y: regionMap.location.y, area: area, name: regionMap.region.name};
+              } else {
+                console.log("Region missing average location: " + regionMap.region.name);
+                x = x + 0.5;
+                y = y + 1.0;
+                return {x: x, y: y, area: area, name: regionMap.region.name};
+              }
+            });
+            this.setState({regionAreas});
+            session.close();
+          })
+          .catch(e => {
+            // TODO: handle errors.
+            console.log(e);
+            session.close();
+          });
+    } else {
+      this.setState({regionAreas: []});
     }
   };
 
@@ -321,15 +539,53 @@ class App extends Component {
     }
   };
 
+  findRegions = (region_ids) => {
+    console.log("Looking for regions: " + region_ids);
+    console.log(region_ids);
+    let elements = [];
+    let keys = Object.keys(this.regions);
+    for (let i = 0; i < keys.length; i++) {
+      let key = keys[i];
+      let region = this.regions[key];
+      if (region_ids.includes(region.id)) {
+        console.log("Matches: " + region.name);
+        let input = document.getElementById("region-" + region.id);
+        if (input) {
+          console.log("Found input element");
+          console.log(input);
+          input.click();
+          elements.push(input);
+        } else {
+          console.log("No such input element: " + key);
+        }
+      }
+    }
+    return elements
+  };
+
+  makeRegionsById = () => {
+    console.log("Creating reverse lookup for regions by ID");
+    let result = {};
+    let keys = Object.keys(this.regions);
+    for (let i = 0; i < keys.length; i++) {
+      let key = keys[i];
+      let region = this.regions[key];
+      result[region.id] = {key: key, region: region};
+    }
+    return result;
+  };
+
   createRegionCheckboxes = () => {
     let rows = [];
     let keys = Object.keys(this.regions);
     for (let i = 0; i < keys.length; i++) {
       let key = keys[i];
       let region = this.regions[key];
+      let elementId = "region-" + region.id;
       rows.push(
         <div key={key} className="row">
           <input
+            id={elementId}
             type="checkbox"
             name={key}
             checked={this.state.filterRegion[key]}
@@ -490,12 +746,39 @@ class App extends Component {
           </div>
           <div className="row">
             <input
-              type="checkbox"
-              name="debugPolygons"
-              checked={this.state.debugMode.debugPolygons}
-              onChange={this.handleDebugChange}
+                type="checkbox"
+                name="debugPolygons"
+                checked={this.state.debugMode.debugPolygons}
+                onChange={this.handleDebugChange}
             />
             Debug Polygons
+          </div>
+          <div className="row">
+            <input
+                type="checkbox"
+                name="debugAreas"
+                checked={this.state.debugMode.debugAreas}
+                onChange={this.handleDebugChange}
+            />
+            Debug Areas
+          </div>
+          <div className="row">
+            <input
+                type="checkbox"
+                name="debugDistances"
+                checked={this.state.debugMode.debugDistances}
+                onChange={this.handleDebugChange}
+            />
+            Debug Distances
+          </div>
+          <div className="row">
+            <input
+                type="checkbox"
+                name="convexHull"
+                checked={this.state.debugMode.convexHull}
+                onChange={this.handleDebugChange}
+            />
+            Convex Hull
           </div>
         </div>
 
@@ -505,12 +788,15 @@ class App extends Component {
               mapSearchPointChange={this.mapSearchPointChange}
               mapCenter={this.state.mapCenter}
               businesses={this.state.pois}
-              regions={this.state.regionPolygons}
+              regionPolygons={this.state.regionPolygons}
+              regionDistances={this.state.regionDistances}
+              regionAreas={this.state.regionAreas}
               businessSelected={this.businessSelected}
               selectedBusiness={this.state.selectedBusiness}
               startMarker={this.state.startMarker}
               setStartAddress={this.setStartAddress}
               setEndAddress={this.setEndAddress}
+              toggleRegionSelected={this.toggleRegionSelected}
               driver={this.driver}
               debugMode={this.state.debugMode}
               routeMode={this.state.routeMode}
