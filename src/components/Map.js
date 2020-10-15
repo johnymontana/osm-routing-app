@@ -337,7 +337,9 @@ class Map extends Component {
   };
 
   geoJSONForPOIs = pois => {
-    return pois.map(poi => {
+    return pois.map(record => {
+      const poi = record['poi'];
+      const amenity = record['amenity'];
       const p = poi.properties;
       return {
         type: "Feature",
@@ -350,7 +352,7 @@ class Map extends Component {
           id: p.node_osm_id.toString(),
           name: p.name,
           icon: "monument",
-          "marker-color": "#fc4353"
+          amenity: amenity
         }
       };
     });
@@ -383,11 +385,15 @@ class Map extends Component {
     return regionDistances.map(distanceObject => {
       let startCoord = [distanceObject.start.x, distanceObject.start.y];
       let endCoord = [distanceObject.end.x, distanceObject.end.y];
+      let distanceKm = Math.round(distanceObject.distance / 1000.0);
       return {
         type: "Feature",
         geometry: {
           type: "LineString",
           coordinates: [startCoord, endCoord]
+        },
+        properties: {
+          "title": `${distanceKm}km`
         }
       };
     });
@@ -407,7 +413,7 @@ class Map extends Component {
         properties: {
           title: "",
           name: areaObject.area,
-          description: areaObject.name + ": " + area,
+          description: `${areaObject.name}:\n${area}km²`,
           id: areaObject.regionId,
           "marker-color": "#fc4353"
         }
@@ -462,8 +468,13 @@ class Map extends Component {
 
   setRegionAreas() {
     const {regionAreas} = this.props;
-    this.regionAreas.features = this.geoJSONForRegionAreas(regionAreas);
-    this.map.getSource("regionAreas").setData(this.regionAreas);
+    if (regionAreas) {
+      this.regionAreas.features = this.geoJSONForRegionAreas(regionAreas);
+      this.map.getSource("regionAreas").setData(this.regionAreas);
+    } else {
+      console.log("Invalid regionAreas in props:");
+      console.log(this.props);
+    }
   }
 
   fetchRoute() {
@@ -702,7 +713,7 @@ class Map extends Component {
       });
 
       this.map.addLayer({
-        id: "regionDistances",
+        id: "regionDistanceLines",
         type: "line",
         source: "regionDistances",
         layout: {
@@ -710,10 +721,30 @@ class Map extends Component {
           "line-join": "round"
         },
         paint: {
-          "line-color": "#55f",
-          "line-width": 5
+          "line-color": "#99f",
+          "line-opacity": 0.3,
+          "line-width": 10
         },
         filter: ["in", "$type", "LineString"]
+      });
+
+      this.map.addLayer({
+        id: "regionDistanceSymbols",
+        type: "symbol",
+        source: "regionDistances",
+        layout: {
+          "symbol-placement": "line",
+          "text-font": ["Open Sans Regular"],
+          "text-field": '{title}',
+          "text-size": {
+            'base': 14,
+            'stops': [
+              [8, 24],
+              [22, 280]
+            ]
+          }
+        },
+        "paint": {}
       });
 
       this.map.addLayer({
@@ -722,7 +753,13 @@ class Map extends Component {
         source: "regionAreas",
         layout: {
           "text-field": ["get", "description"],
-          "text-size": 24,
+          "text-size": {
+            'base': 1.25,
+            'stops': [
+              [1, 8],
+              [22, 780]
+            ]
+          },
           "icon-image": ["concat", ["get", "icon"], "-15"]
         },
         filter: ["in", "$type", "Point"]
@@ -753,8 +790,28 @@ class Map extends Component {
         type: "circle",
         source: "geojson",
         paint: {
-          "circle-radius": 5,
-          "circle-color": "#000"
+          'circle-radius': {
+            'base': 1.75,
+            'stops': [
+              [8, 6],
+              [22, 180]
+            ]
+          },
+          'circle-color': [
+            'match',
+            ['get', 'amenity'],
+            'restaurant',
+            '#fbb03b',
+            'fast_food',
+            '#223b53',
+            'cafe',
+            '#e55e5e',
+            'pub',
+            '#3bb2d0',
+            'bar',
+            '#b23bd0',
+            /* other */ '#555'
+          ]
         },
         filter: ["in", "$type", "Point"]
       });

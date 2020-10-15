@@ -5,13 +5,13 @@
   "private": true,
   "dependencies": {
     "mapbox-gl": "git+https://git@github.com/johnymontana/mapbox-gl-js.git",
-    "moment": "^2.22.1",
-    "neo4j-driver": "^1.6.1",
+    "moment": "^2.29.1",
+    "neo4j-driver": "^4.1.2",
     "nivo": "^0.31.0",
-    "react": "^16.3.2",
-    "react-dom": "^16.3.2",
+    "react": "^16.13.1",
+    "react-dom": "^16.13.1",
     "react-scripts": "^1.1.5",
-    "react-virtualized": "^9.19.0"
+    "react-virtualized": "^9.22.2"
   },
   "scripts": {
     "start": "react-scripts start",

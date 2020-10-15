@@ -2,7 +2,6 @@ import React, {Component} from "react";
 import "./App.css";
 import Map from "./components/Map";
 import neo4j from "neo4j-driver/lib/browser/neo4j-web";
-import moment from "moment";
 
 class App extends Component {
   constructor(props) {
@@ -11,18 +10,16 @@ class App extends Component {
 
     this.state = {
       focusedInput,
-      startDate: moment("2014-01-01"),
-      endDate: moment("2018-01-01"),
       businesses: [],
       starsData: [],
       reviews: [{ day: "2018-01-01", value: 10 }],
       categoryData: [],
       selectedBusiness: false,
       mapCenter: {
-        latitude: 56.0,
-        longitude: 13.0,
-        radius: 0.5,
-        zoom: 10
+        latitude: 55.599575,
+        longitude: 13.0059854,
+        radius: 2.5,
+        zoom: 8
       },
       startAddress: "",
       endAddress: "",
@@ -31,12 +28,14 @@ class App extends Component {
         "Drag me to search for places of interest to visit!",
         "Select two places to route between them!"
       ],
-      debugMode: {debugRouting: false, debugPolygons: false, debugAreas: false, debugDistances: false, convexHull: false},
+      debugMode: {debugRouting: false, debugPolygons: true, debugAreas: false, debugDistances: false, convexHull: false, allPolygons: false},
       regionPolygons: [],
       regionDistances: [],
       regionAreas: [],
       filterRegion: {},
       regionIds: [],
+      amenityIds: [],
+      filterAmenities: {},
       routeMode: "shortestpath"
     };
     this.regionsNY = {
@@ -88,6 +87,17 @@ class App extends Component {
       "Östergötlands": {"name": "Östergötlands län", id: 940675}
     };
     this.regionsById = this.makeRegionsById();
+    this.amenities = {
+      "restaurant": {"name": "Restaurant"},
+      "fast_food": {"name": "Fast Food"},
+      "cafe": {"name": "Cafe"},
+      "pub": {"name": "Pub"},
+      "bar": {"name": "Bar"},
+      "cinema": {"name": "Cinema"},
+      "ice_cream": {"name": "Ice Cream"},
+      "nightclub": {"name": "Nightclub"},
+      "food_court": {"name": "Food Court"}
+    };
     this.driver = neo4j.driver(
       process.env.REACT_APP_NEO4J_URI,
       neo4j.auth.basic(
@@ -141,25 +151,6 @@ class App extends Component {
     });
   };
 
-  onDatesChange = ({ startDate, endDate }) => {
-    if (startDate && endDate) {
-      this.setState(
-        {
-          startDate,
-          endDate
-        },
-        () => {
-          this.fetchBusinesses();
-        }
-      );
-    } else {
-      this.setState({
-        startDate,
-        endDate
-      });
-    }
-  };
-
   handleRouteChange = event => {
     const target = event.target;
     const value = target.value;
@@ -192,11 +183,11 @@ class App extends Component {
   };
 
   updateRegionSelection = target => {
-    console.log("Updating input element");
+    console.log("Updating regions input element");
     console.log(target);
     let filterRegion = this.state.filterRegion;
     let regionIds = this.state.regionIds;
-    if(this.regions[target.name]) {
+    if (this.regions[target.name]) {
       let regionId = this.regions[target.name]["id"];
       if (target.type === "checkbox" && target.checked) {
         if (!regionIds.includes(regionId)) {
@@ -207,13 +198,44 @@ class App extends Component {
         regionIds = regionIds.filter(e => e !== regionId);
         filterRegion[target.name] = false;
       }
-    }else{
+    } else {
       console.log(`No such region: ${target.name}`);
     }
+    console.log("Setting selected regions to " + regionIds);
 
     this.setState({
       filterRegion: filterRegion,
       regionIds: regionIds
+    }, () => {
+      this.fetchBusinesses();
+      this.fetchSelectedRegions();
+      this.fetchRegionAreas();
+      this.fetchRegionDistances();
+    });
+  };
+
+  handleAmenitiesFilterChange = event => {
+    const target = event.target;
+    this.updateAmenitiesSelection(target);
+  };
+
+  updateAmenitiesSelection = target => {
+    console.log("Updating amenities input element");
+    console.log(target);
+    let filterAmenities = this.state.filterAmenities;
+    let amenity = target.name;
+    if (this.amenities[amenity]) {
+      filterAmenities[amenity] = !!(target.type === "checkbox" && target.checked);
+    } else {
+      console.log(`No such amenity: ${amenity}`);
+    }
+    const amenityIds = Object.keys(filterAmenities).filter(key => !!filterAmenities[key]);
+    console.log("Setting selected amenities to " + amenityIds);
+    console.log(filterAmenities);
+
+    this.setState({
+      amenityIds: amenityIds,
+      filterAmenities: filterAmenities
     }, () => {
       this.fetchBusinesses();
       this.fetchSelectedRegions();
@@ -287,30 +309,39 @@ class App extends Component {
 
     let query;
 
-    if (this.state.regionIds) {
+    const amenityPredicate = (this.state.amenityIds && this.state.amenityIds.length > 0) ? "AND t.amenity IN $amenities" : "";
+    if (this.state.regionIds && this.state.regionIds.length > 0) {
+      console.log("Fetching points of interest within regions: " + this.state.regionIds);
       query = `MATCH (r:OSMRelation) USING INDEX r:OSMRelation(relation_osm_id)
         WHERE r.relation_osm_id IN $regionIds AND exists(r.polygon)
       WITH r.polygon as polygon
-      MATCH (p:PointOfInterest)
+      MATCH (p:PointOfInterest)-[:TAGS]->(t:OSMTags)
         WHERE distance(p.location, point({latitude: $lat, longitude:$lon})) < ($radius * 1000)
         AND spatial.algo.withinPolygon(p.location,polygon)
-      RETURN p
+        ${amenityPredicate}
+      RETURN p AS poi, t.amenity AS amenity
       `;
     } else {
-      query = `MATCH (p:PointOfInterest)
+      console.log("Fetching all points of interest");
+      query = `MATCH (p:PointOfInterest)-[:TAGS]->(t:OSMTags)
         WHERE distance(p.location, point({latitude: $lat, longitude:$lon})) < ($radius * 1000)
-      RETURN p`;
+        ${amenityPredicate}
+      RETURN p AS poi, t.amenity AS amenity`;
     }
+    console.log(query);
     session
       .run(query, {
         lat: mapCenter.latitude,
         lon: mapCenter.longitude,
         radius: mapCenter.radius,
-        regionIds: this.state.regionIds
+        regionIds: this.state.regionIds,
+        amenities: this.state.amenityIds
       })
       .then(result => {
         console.log(result);
-        const pois = result.records.map(r => r.get("p"));
+        const pois = result.records.map(r => {
+          return {"poi": r.get("poi"), "amenity": r.get("amenity")};
+        });
         this.setState({ pois });
         session.close();
       })
@@ -336,7 +367,6 @@ class App extends Component {
       session
           .run(query, {regionIds: this.state.regionIds})
           .then(result => {
-            console.log(result);
             const regionPolygons = result.records.map(r => {
               let region_id = r.get("region_id");
               let polygon = r.get("region");
@@ -390,13 +420,24 @@ class App extends Component {
         }
       }
 
-      let query = `
+      let distanceFunc = this.state.debugMode.convexHull ? "spatial.algo.convexHull.distance.ends(s1, s2)" : "spatial.algo.distance.ends(s1, s2)";
+
+      let query = this.state.debugMode.allPolygons ? `
       UNWIND $pairs AS pair
       MATCH (r1:OSMRelation)-[:POLYGON_STRUCTURE*]->(p1) USING INDEX r1:OSMRelation(relation_osm_id)
         WHERE r1.relation_osm_id=pair[0] AND exists(p1.polygon)
       OPTIONAL MATCH (r2:OSMRelation)-[:POLYGON_STRUCTURE*]->(p2) USING INDEX r2:OSMRelation(relation_osm_id)
         WHERE r2.relation_osm_id=pair[1] AND exists(p2.polygon)
-      RETURN pair, spatial.algo.distance.ends(p1.polygon, p2.polygon) AS distance
+      WITH pair, p1.polygon AS s1, p2.polygon AS s2
+      RETURN pair, ${distanceFunc} AS distance
+      ` : `
+      UNWIND $pairs AS pair
+      MATCH (r1:OSMRelation) USING INDEX r1:OSMRelation(relation_osm_id)
+        WHERE r1.relation_osm_id=pair[0]
+      OPTIONAL MATCH (r2:OSMRelation) USING INDEX r2:OSMRelation(relation_osm_id)
+        WHERE r2.relation_osm_id=pair[1]
+      WITH pair, spatial.osm.property.polygonShell(r1) AS s1, spatial.osm.property.polygonShell(r2) AS s2
+      RETURN pair, ${distanceFunc} AS distance
       `;
       console.log(query);
 
@@ -442,7 +483,7 @@ class App extends Component {
       let query = `
       MATCH (r:OSMRelation)-[:POLYGON_STRUCTURE*]->(p) USING INDEX r:OSMRelation(relation_osm_id)
         WHERE r.relation_osm_id IN $regionIds AND exists(p.polygon)
-      RETURN r.relation_osm_id AS region_id, spatial.algo.area(p.polygon) AS area
+      RETURN r.relation_osm_id AS region_id, labels(p) AS labels, spatial.algo.area(p.polygon) AS area
       `;
       console.log(query);
       let x = 13.5;
@@ -453,22 +494,44 @@ class App extends Component {
           .then(result => {
             console.log("Got areas:");
             console.log(result);
-            const regionAreas = result.records.map(r => [r.get("region_id"), r.get("area")]).filter(data => {
-              const area = data[1];
+            const regionAreasObj = result.records.map(r => [r.get("region_id"), r.get("labels"), r.get("area")]).filter(data => {
+              const area = data[2];
               return area > 0;
-            }).map(data => {
+            }).reduce((acc, data) => {
               const region_id = data[0];
-              const area = data[1];
+              const labels = data[1];
+              const area = data[2];
               const regionMap = this.regionsById[region_id];
-              if (regionMap.location) {
-                return {x: regionMap.location.x, y: regionMap.location.y, area: area, name: regionMap.region.name};
-              } else {
-                console.log("Region missing average location: " + regionMap.region.name);
-                x = x + 0.5;
-                y = y + 1.0;
-                return {x: x, y: y, area: area, name: regionMap.region.name};
+              if (!acc.hasOwnProperty(region_id)) {
+                if (regionMap.location) {
+                  acc[region_id] = {
+                    x: regionMap.location.x,
+                    y: regionMap.location.y,
+                    area: 0.0,
+                    name: regionMap.region.name
+                  };
+                } else {
+                  console.log("Region missing average location: " + regionMap.region.name);
+                  x = x + 0.5;
+                  y = y + 1.0;
+                  acc[region_id] = {x: x, y: y, area: 0.0, name: regionMap.region.name};
+                }
               }
-            });
+              var total = acc[region_id].area;
+              if (labels.includes("Hole")) {
+                console.log("Removing hole area " + area + " from total " + total + " for " + regionMap.region.name);
+                total = total - area;
+              } else {
+                console.log("Adding shell area " + area + " to total " + total + " for " + regionMap.region.name);
+                total = total + area;
+              }
+              acc[region_id].area = total;
+              return acc;
+            }, {});
+            console.log("Updating areas data: " + regionAreasObj);
+            console.log(regionAreasObj);
+            const regionAreas = Object.values(regionAreasObj);
+            console.log("Updating areas data: " + regionAreas);
             this.setState({regionAreas});
             session.close();
           })
@@ -598,6 +661,29 @@ class App extends Component {
     return rows
   };
 
+  createAmenitiesCheckboxes = () => {
+    let rows = [];
+    let keys = Object.keys(this.amenities);
+    for (let i = 0; i < keys.length; i++) {
+      let key = keys[i];
+      let amenity = this.amenities[key];
+      let elementId = "amenity-" + key;
+      rows.push(
+        <div key={key} className="row">
+          <input
+            id={elementId}
+            type="checkbox"
+            name={key}
+            checked={this.state.filterAmenities[key]}
+            onChange={this.handleAmenitiesFilterChange}
+          />
+          {amenity.name}
+        </div>
+      )
+    }
+    return rows
+  };
+
   render() {
     return (
       <div id="app-wrapper">
@@ -694,6 +780,8 @@ class App extends Component {
         <div id="app-left-side-panel">
           <h2>Filter Region</h2>
           {this.createRegionCheckboxes()}
+          <h2>Filter Amenities</h2>
+          {this.createAmenitiesCheckboxes()}
           <h2>Route Algorithm</h2>
           <div className="row">
             <fieldset>
@@ -742,43 +830,52 @@ class App extends Component {
               checked={this.state.debugMode.debugRouting}
               onChange={this.handleDebugChange}
             />
-            Debug Routing
+            Debug Routing Graph
           </div>
           <div className="row">
             <input
-                type="checkbox"
-                name="debugPolygons"
-                checked={this.state.debugMode.debugPolygons}
-                onChange={this.handleDebugChange}
+              type="checkbox"
+              name="debugPolygons"
+              checked={this.state.debugMode.debugPolygons}
+              onChange={this.handleDebugChange}
             />
-            Debug Polygons
+            Show Selected Polygons
           </div>
           <div className="row">
             <input
-                type="checkbox"
-                name="debugAreas"
-                checked={this.state.debugMode.debugAreas}
-                onChange={this.handleDebugChange}
+              type="checkbox"
+              name="debugAreas"
+              checked={this.state.debugMode.debugAreas}
+              onChange={this.handleDebugChange}
             />
-            Debug Areas
+            Show Polygon Areas
           </div>
           <div className="row">
             <input
-                type="checkbox"
-                name="debugDistances"
-                checked={this.state.debugMode.debugDistances}
-                onChange={this.handleDebugChange}
+              type="checkbox"
+              name="debugDistances"
+              checked={this.state.debugMode.debugDistances}
+              onChange={this.handleDebugChange}
             />
-            Debug Distances
+            Show Distances between Polygons
           </div>
           <div className="row">
             <input
-                type="checkbox"
-                name="convexHull"
-                checked={this.state.debugMode.convexHull}
-                onChange={this.handleDebugChange}
+              type="checkbox"
+              name="allPolygons"
+              checked={this.state.debugMode.allPolygons}
+              onChange={this.handleDebugChange}
             />
-            Convex Hull
+            Include sub-polygons in distances
+          </div>
+          <div className="row">
+            <input
+              type="checkbox"
+              name="convexHull"
+              checked={this.state.debugMode.convexHull}
+              onChange={this.handleDebugChange}
+            />
+            Show Convex Hull
           </div>
         </div>
 
