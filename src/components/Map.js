@@ -140,7 +140,7 @@ class Map extends Component {
   }
 
   createDebugIntersections = (lon, lat, radius) => {
-    const session = this.props.driver.session();
+    const session = this.props.session();
     const query = `
     MATCH (p:Intersection)
     WHERE distance(p.location, point({latitude: $lat, longitude: $lon})) < $radius * 1000
@@ -200,7 +200,7 @@ class Map extends Component {
   };
 
   createDebugRoutable = (lon, lat, radius) => {
-    const session = this.props.driver.session();
+    const session = this.props.session();
     const query = `
     MATCH (p:Routable)
     WHERE distance(p.location, point({latitude: $lat, longitude: $lon})) < $radius * 1000
@@ -247,7 +247,7 @@ class Map extends Component {
   };
 
   createDebugPointsOfInterest = (lon, lat, radius) => {
-    const session = this.props.driver.session();
+    const session = this.props.session();
     const query = `
     MATCH (p:PointOfInterest)
     WHERE distance(p.location, point({latitude: $lat, longitude: $lon})) < $radius * 1000
@@ -484,7 +484,7 @@ class Map extends Component {
   }
 
   fetchRouteFor(startPOI, endPOI) {
-    const session = this.props.driver.session();
+    const session = this.props.session();
 
     let query;
 
@@ -844,14 +844,18 @@ class Map extends Component {
       this.map.on("click", e => {
         console.log("Mouse clicked");
         console.log(e);
-        if(e.lngLat) {
+        if (e.lngLat) {
           const point = {
             latitude: e.lngLat.lat,
             longitude: e.lngLat.lng,
           };
           console.log(point);
-          this.props.toggleRegionSelected(point);
-        }else{
+          if (this.props.debugMode.debugPolygons) {
+            this.props.toggleRegionSelected(point);
+          } else {
+            console.log("Not in polygon mode: ignoring polygon selection on mouse click");
+          }
+        } else {
           console.log("No lat/lng in mouse event");
         }
       });

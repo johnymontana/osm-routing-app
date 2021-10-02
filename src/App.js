@@ -16,8 +16,8 @@ class App extends Component {
       categoryData: [],
       selectedBusiness: false,
       mapCenter: {
-        latitude: 55.599575,
-        longitude: 13.0059854,
+        latitude: 0,
+        longitude: 0,
         radius: 2.5,
         zoom: 8
       },
@@ -28,7 +28,7 @@ class App extends Component {
         "Drag me to search for places of interest to visit!",
         "Select two places to route between them!"
       ],
-      debugMode: {debugRouting: false, debugPolygons: true, debugAreas: false, debugDistances: false, convexHull: false, allPolygons: false},
+      debugMode: {debugRouting: false, debugPolygons: false, debugAreas: false, debugDistances: false, convexHull: false, allPolygons: false},
       regionPolygons: [],
       regionDistances: [],
       regionAreas: [],
@@ -39,52 +39,169 @@ class App extends Component {
       routeMode: "shortestpath"
     };
     this.regionsNY = {
-      "manhattan": {"name": "Manhattan", id: 8398124},
-      "brooklyn": {"name": "Brooklyn", id: 369518},
-      "queens": {"name": "Queens", id: 369519},
-      "bronx": {"name": "The Bronx", id: 2552450},
-      "staten": {"name": "Staten Island", id: 962876}
+      "New York": {
+        "regions":
+          {
+            "manhattan": {"name": "Manhattan", id: 8398124},
+            "brooklyn": {"name": "Brooklyn", id: 369518},
+            "queens": {"name": "Queens", id: 369519},
+            "bronx": {"name": "The Bronx", id: 2552450},
+            "staten": {"name": "Staten Island", id: 962876}
+          }
+      }
     };
     this.regionsSF = {
-      "corte_madera": {"name": "Corte Madera", id: 1260313},
-      "mill_valley": {"name": "Mill Valley", id: 112703},
-      "tiburon": {"name": "Tiburon", id: 2829690},
-      "belvedere": {"name": "Belvedere", id: 2829688},
-      "sausalito": {"name": "Sausalito", id: 2829689},
-      "san_francisco": {"name": "San Francisco", id: 111968},
-      "daly_city": {"name": "Daly City", id: 112271},
-      "brisbane": {"name": "Brisbane", id: 2834528},
-      "south_san_francisco": {"name": "South San Francisco", id: 2834558},
-      "hillsborough": {"name": "Hillsborough", id: 112285},
-      "san_mateo": {"name": "San Mateo", id: 2835017}
+      "San Fransisco": {
+        "admin_level": 8,
+        "border_type": "City",
+        "regions": {
+          "corte_madera": {"name": "Corte Madera", id: 1260313},
+          "mill_valley": {"name": "Mill Valley", id: 112703},
+          "tiburon": {"name": "Tiburon", id: 2829690},
+          "belvedere": {"name": "Belvedere", id: 2829688},
+          "sausalito": {"name": "Sausalito", id: 2829689},
+          "san_francisco": {"name": "San Francisco", id: 111968},
+          "daly_city": {"name": "Daly City", id: 112271},
+          "brisbane": {"name": "Brisbane", id: 2834528},
+          "south_san_francisco": {"name": "South San Francisco", id: 2834558},
+          "hillsborough": {"name": "Hillsborough", id: 112285},
+          "san_mateo": {"name": "San Mateo", id: 2835017}
+        }
+      }
     };
-    this.regions = {
-      "Sweden": {"name": "Sweden", id: 4116216},
-      "Blekinge": {"name": "Blekinge län", id: 54413},
-      "Dalarnas": {"name": "Dalarnas län", id: 52834},
-      "Gotlands": {"name": "Gotlands län", id: 941530},
-      "Gävleborgs": {"name": "Gävleborgs län", id: 52832},
-      "Hallands": {"name": "Hallands län", id: 54403},
-      "Jämtlands": {"name": "Jämtlands län", id: 52826},
-      "Jönköpings": {"name": "Jönköpings län", id: 54374},
-      "Kalmar": {"name": "Kalmar län", id: 54417},
-      "Kronobergs": {"name": "Kronobergs län", id: 54412},
-      "Norrbottens": {"name": "Norrbottens län", id: 52824},
-      "Skanör": {"name": "Skanör med Falsterbo", id: 43332835, isWay: true},
-      "Skåne": {"name": "Skåne län", id: 54409},
-      "Skåne (land)": {"name": "Skåne län (land)", id: 4473774},
-      "Småland": {"name": "Småland län", id: 9691220},
-      "Stockholms": {"name": "Stockholms län", id: 54391},
-      "Södermanlands": {"name": "Södermanlands län", id: 54386},
-      "Uppsala": {"name": "Uppsala län", id: 54220},
-      "Ven": {"name": "Ven (island)", id: 3172367},
-      "Värmlands": {"name": "Värmlands län", id: 54223},
-      "Västerbottens": {"name": "Västerbottens län", id: 52825},
-      "Västernorrlands": {"name": "Västernorrlands län", id: 52827},
-      "Västmanlands": {"name": "Västmanlands län", id: 54221},
-      "Västra Götalands": {"name": "Västra Götalands län", id: 54367},
-      "Örebro": {"name": "Örebro län", id: 54222},
-      "Östergötlands": {"name": "Östergötlands län", id: 940675}
+    this.regionsAU = {
+      "Australia": {
+        "admin_level": 2,
+        "type": "Country",
+        "regions": {
+          "Australia": {"name": "Australia", id: 80500},
+        }
+      },
+      "States": {
+        "admin_level": 4,
+        "type": "State",
+        "regions": {
+          "Tasmania": {"name": "Tasmania", id: 2369652},
+          "Victoria": {"name": "Victoria", id: 2316741},
+          "South Australia": {"name": "South Australia", id: 2316596},
+          "Western Australia": {"name": "Western Australia", id: 2316598},
+          "Queensland": {"name": "Queensland", id: 2316595},
+          "New South Wales": {"name": "New South Wales", id: 2316593},
+        }
+      },
+      "Internal Territories": {
+        "admin_level": 4,
+        "type": "Internal Territories",
+        "regions": {
+          "Australian Capital Territory": {"name": "Australian Capital Territory", id: 2354197},
+          "Jervis Bay Territory": {"name": "Jervis Bay Territory", id: 2357330},
+          "Northern Territory": {"name": "Northern Territory", id: 2316594},
+        }
+      },
+      "External Territories": {
+        "admin_level": 4,
+        "type": "External Territories",
+        "regions": {
+          "Heard Island and McDonald Islands": {"name": "Heard Island and McDonald Islands", id: 2177227},
+          "Christmas Island": {"name": "Christmas Island", id: 2177207},
+          "Ashmore and Cartier Islands": {"name": "Ashmore and Cartier Islands", id: 2559345},
+          "Norfolk Island": {"name": "Norfolk Island", id: 2574988},
+          "Coral Sea Islands": {"name": "Coral Sea Islands", id: 3225677},
+          "Cocos (Keeling) Islands": {"name": "Cocos (Keeling) Islands", id: 82636},
+        }
+      },
+      "Cities": {
+        "admin_level": 7,
+        "type": "City",
+        "regions": {
+          "Melbourne": {"name": "Melbourne", id: 4246124},
+          "Sydney": {"name": "Sydney", id: 5750005},
+          "Newcastle-Maitland": {"name": "Newcastle-Maitland", id: 6005680},
+          "Burnie": {"name": "Burnie", id: 10632587},
+          "Devonport": {"name": "Devonport", id: 10632642},
+          "Launceston": {"name": "Launceston", id: 10632701},
+          "Hobart": {"name": "Hobart", id: 10632745},
+          "Ulverstone": {"name": "Ulverstone", id: 10660461},
+          "Adelaide": {"name": "Adelaide", id: 11381689},
+        }
+      },
+      "Districts": {
+        "admin_level": 7,
+        "type": "District",
+        "regions": {
+          "District of Kowen": {"name": "District of Kowen", id: 3336039},
+          "District of Majura": {"name": "District of Majura", id: 3336043},
+          "District of Molonglo Valley": {"name": "District of Molonglo Valley", id: 3337649},
+          "District of Weston Creek": {"name": "District of Weston Creek", id: 3337650},
+          "District of Stromlo": {"name": "District of Stromlo", id: 3337651},
+          "District of Belconnen": {"name": "District of Belconnen", id: 3337654},
+          "District of Canberra Central": {"name": "District of Canberra Central", id: 3339545},
+          "District of Gungahlin": {"name": "District of Gungahlin", id: 3339601},
+          "District of Hall": {"name": "District of Hall", id: 3339672},
+          "District of Coree": {"name": "District of Coree", id: 3339705},
+          "District of Cotter River": {"name": "District of Cotter River", id: 3387680},
+          "District of Paddys River": {"name": "District of Paddys River", id: 3387681},
+          "District of Tuggeranong": {"name": "District of Tuggeranong", id: 5333901},
+          "District of Woden Valley": {"name": "District of Woden Valley", id: 5334286},
+          "District of Jerrabomberra": {"name": "District of Jerrabomberra", id: 5335846},
+          "District of Tennent": {"name": "District of Tennent", id: 11911716},
+          "District of Rendezvous Creek": {"name": "District of Rendezvous Creek", id: 11911717},
+          "District of Booth": {"name": "District of Booth", id: 11911812},
+          "District of Mount Clear": {"name": "District of Mount Clear", id: 11911862},
+        }
+      },
+    };
+    this.regionsSE = {
+      "Sweden": {
+        "regions": {
+          "Sweden": {"name": "Sweden", id: 4116216},
+          "Blekinge": {"name": "Blekinge län", id: 54413},
+          "Dalarnas": {"name": "Dalarnas län", id: 52834},
+          "Gotlands": {"name": "Gotlands län", id: 941530},
+          "Gävleborgs": {"name": "Gävleborgs län", id: 52832},
+          "Hallands": {"name": "Hallands län", id: 54403},
+          "Jämtlands": {"name": "Jämtlands län", id: 52826},
+          "Jönköpings": {"name": "Jönköpings län", id: 54374},
+          "Kalmar": {"name": "Kalmar län", id: 54417},
+          "Kronobergs": {"name": "Kronobergs län", id: 54412},
+          "Norrbottens": {"name": "Norrbottens län", id: 52824},
+          "Skanör": {"name": "Skanör med Falsterbo", id: 43332835, isWay: true},
+          "Skåne": {"name": "Skåne län", id: 54409},
+          "Skåne (land)": {"name": "Skåne län (land)", id: 4473774},
+          "Småland": {"name": "Småland län", id: 9691220},
+          "Stockholms": {"name": "Stockholms län", id: 54391},
+          "Södermanlands": {"name": "Södermanlands län", id: 54386},
+          "Uppsala": {"name": "Uppsala län", id: 54220},
+          "Ven": {"name": "Ven (island)", id: 3172367},
+          "Värmlands": {"name": "Värmlands län", id: 54223},
+          "Västerbottens": {"name": "Västerbottens län", id: 52825},
+          "Västernorrlands": {"name": "Västernorrlands län", id: 52827},
+          "Västmanlands": {"name": "Västmanlands län", id: 54221},
+          "Västra Götalands": {"name": "Västra Götalands län", id: 54367},
+          "Örebro": {"name": "Örebro län", id: 54222},
+          "Östergötlands": {"name": "Östergötlands län", id: 940675}
+        }
+      }
+    };
+    this.modelSE = {
+      mapCenter: {
+        latitude: 55.599575,
+        longitude: 13.0059854,
+        radius: 2.5,
+        zoom: 10
+      },
+      database: "sweden",
+      regions: this.regionsSE
+    };
+    this.model = {
+      mapCenter: {
+        latitude: -37.8302,
+        longitude:144.9691,
+        radius: 2.5,
+        zoom: 10
+      },
+      database: "australia",
+      regions: this.regionsAU
     };
     this.regionsById = this.makeRegionsById();
     this.amenities = {
@@ -110,9 +227,13 @@ class App extends Component {
     this.fetchBusinesses();
   }
 
+  session = () => {
+    return this.driver.session({database: this.model.database});
+  }
+
   toggleRegionSelected = point => {
     console.log("Event to find regions at: " + point);
-    const session = this.driver.session();
+    const session = this.session();
 
     let query = `
       WITH point($location) AS location
@@ -187,16 +308,16 @@ class App extends Component {
     console.log(target);
     let filterRegion = this.state.filterRegion;
     let regionIds = this.state.regionIds;
-    if (this.regions[target.name]) {
-      let regionId = this.regions[target.name]["id"];
+    if (this.regionsById[target.name]) {
+      let region = this.regionsById[target.name]["region"];
       if (target.type === "checkbox" && target.checked) {
-        if (!regionIds.includes(regionId)) {
-          regionIds.push(regionId);
+        if (!regionIds.includes(region.id)) {
+          regionIds.push(region.id);
         }
-        filterRegion[target.name] = true;
+        filterRegion[region.id] = true;
       } else {
-        regionIds = regionIds.filter(e => e !== regionId);
-        filterRegion[target.name] = false;
+        regionIds = regionIds.filter(e => e !== region.id);
+        filterRegion[region.id] = false;
       }
     } else {
       console.log(`No such region: ${target.name}`);
@@ -304,8 +425,16 @@ class App extends Component {
   // }
 
   fetchBusinesses = () => {
+    if (this.state.mapCenter.latitude === 0) {
+      console.log(this.model.mapCenter);
+      // eslint-disable-next-line
+      this.state = {
+        ...this.state,
+        mapCenter: this.model.mapCenter
+      };
+    }
     const { mapCenter } = this.state;
-    const session = this.driver.session();
+    const session = this.session();
 
     let query;
 
@@ -313,16 +442,20 @@ class App extends Component {
     if (this.state.regionIds && this.state.regionIds.length > 0) {
       console.log("Fetching points of interest within regions: " + this.state.regionIds);
       query = `MATCH (r:OSMRelation) USING INDEX r:OSMRelation(relation_osm_id)
-        WHERE r.relation_osm_id IN $regionIds AND exists(r.polygon)
-      WITH r.polygon as polygon
+        WHERE r.relation_osm_id IN $regionIds AND exists((r)-[:POLYGON_STRUCTURE]->())
+      WITH spatial.osm.property.polygonShell(r) as polygon
+      WITH polygon, spatial.algo.convexHull(polygon) AS simplified
       MATCH (p:PointOfInterest)-[:TAGS]->(t:OSMTags)
         WHERE distance(p.location, point({latitude: $lat, longitude:$lon})) < ($radius * 1000)
-        AND spatial.algo.withinPolygon(p.location,polygon)
         ${amenityPredicate}
+      WITH p, t, polygon
+        WHERE spatial.algo.withinPolygon(p.location,simplified)
+      WITH p, t
+        WHERE spatial.algo.withinPolygon(p.location,polygon)
       RETURN p AS poi, t.amenity AS amenity
       `;
     } else {
-      console.log("Fetching all points of interest");
+      console.log("Fetching all points of interest within " + mapCenter.radius + "km of (" + mapCenter.latitude + "," + mapCenter.longitude + ")");
       query = `MATCH (p:PointOfInterest)-[:TAGS]->(t:OSMTags)
         WHERE distance(p.location, point({latitude: $lat, longitude:$lon})) < ($radius * 1000)
         ${amenityPredicate}
@@ -355,7 +488,7 @@ class App extends Component {
   fetchSelectedRegions = () => {
     if (this.state.regionIds && this.state.debugMode.debugPolygons) {
 
-      const session = this.driver.session();
+      const session = this.session();
 
       let queryResult = this.state.debugMode.convexHull ? "spatial.algo.convexHull(p.polygon)" : "p.polygon";
       let query = `MATCH (r:OSMRelation)-[:POLYGON_STRUCTURE*]->(p) USING INDEX r:OSMRelation(relation_osm_id)
@@ -409,7 +542,7 @@ class App extends Component {
         this.setState({regionDistances: []});
         this.regionDistancesSession.close();
       }
-      this.regionDistancesSession = this.driver.session();
+      this.regionDistancesSession = this.session();
 
       let pairs = [];
       for (let i = 0; i < this.state.regionIds.length; i++) {
@@ -478,7 +611,7 @@ class App extends Component {
   fetchRegionAreas = () => {
     if (this.state.regionIds.length && this.state.debugMode.debugAreas) {
 
-      const session = this.driver.session();
+      const session = this.session();
 
       let query = `
       MATCH (r:OSMRelation)-[:POLYGON_STRUCTURE*]->(p) USING INDEX r:OSMRelation(relation_osm_id)
@@ -486,8 +619,8 @@ class App extends Component {
       RETURN r.relation_osm_id AS region_id, labels(p) AS labels, spatial.algo.area(p.polygon) AS area
       `;
       console.log(query);
-      let x = 13.5;
-      let y = 56.5;
+      let x = this.state.mapCenter.longitude;
+      let y = this.state.mapCenter.latitude;
 
       session
           .run(query, {regionIds: this.state.regionIds})
@@ -606,20 +739,24 @@ class App extends Component {
     console.log("Looking for regions: " + region_ids);
     console.log(region_ids);
     let elements = [];
-    let keys = Object.keys(this.regions);
-    for (let i = 0; i < keys.length; i++) {
-      let key = keys[i];
-      let region = this.regions[key];
-      if (region_ids.includes(region.id)) {
-        console.log("Matches: " + region.name);
-        let input = document.getElementById("region-" + region.id);
-        if (input) {
-          console.log("Found input element");
-          console.log(input);
-          input.click();
-          elements.push(input);
-        } else {
-          console.log("No such input element: " + key);
+    let regionGroups = Object.keys(this.model.regions);
+    for (let i = 0; i < regionGroups.length; i++) {
+      let group = regionGroups[i];
+      let regionKeys = Object.keys(this.model.regions[group].regions);
+      for (let i = 0; i < regionKeys.length; i++) {
+        let key = regionKeys[i];
+        let region = this.model.regions[group].regions[key];
+        if (region_ids.includes(region.id)) {
+          console.log("Matches: " + region.name);
+          let input = document.getElementById("region-" + region.id);
+          if (input) {
+            console.log("Found input element");
+            console.log(input);
+            input.click();
+            elements.push(input);
+          } else {
+            console.log("No such input element: " + key);
+          }
         }
       }
     }
@@ -629,34 +766,45 @@ class App extends Component {
   makeRegionsById = () => {
     console.log("Creating reverse lookup for regions by ID");
     let result = {};
-    let keys = Object.keys(this.regions);
-    for (let i = 0; i < keys.length; i++) {
-      let key = keys[i];
-      let region = this.regions[key];
-      result[region.id] = {key: key, region: region};
+    let regionGroups = Object.keys(this.model.regions);
+    for (let g = 0; g < regionGroups.length; g++) {
+      let group = regionGroups[g];
+      let regionKeys = Object.keys(this.model.regions[group].regions);
+      for (let i = 0; i < regionKeys.length; i++) {
+        let key = regionKeys[i];
+        let region = this.model.regions[group].regions[key];
+        result[region.id] = {group: group, key: key, region: region};
+      }
     }
     return result;
   };
 
   createRegionCheckboxes = () => {
     let rows = [];
-    let keys = Object.keys(this.regions);
-    for (let i = 0; i < keys.length; i++) {
-      let key = keys[i];
-      let region = this.regions[key];
-      let elementId = "region-" + region.id;
+    let regionGroups = Object.keys(this.model.regions);
+    for (let g = 0; g < regionGroups.length; g++) {
+      let group = regionGroups[g];
       rows.push(
-        <div key={key} className="row">
-          <input
-            id={elementId}
-            type="checkbox"
-            name={key}
-            checked={this.state.filterRegion[key]}
-            onChange={this.handleRegionFilterChange}
-          />
-          {region.name}
-        </div>
-      )
+        <h2>Filter {group}</h2>
+      );
+      let regionKeys = Object.keys(this.model.regions[group].regions);
+      for (let i = 0; i < regionKeys.length; i++) {
+        let key = regionKeys[i];
+        let region = this.model.regions[group].regions[key];
+        let elementId = "region-" + region.id;
+        rows.push(
+          <div key={key} className="row">
+            <input
+              id={elementId}
+              type="checkbox"
+              name={region.id}
+              checked={this.state.filterRegion[region.id]}
+              onChange={this.handleRegionFilterChange}
+            />
+            {region.name}
+          </div>
+        );
+      }
     }
     return rows
   };
@@ -778,7 +926,6 @@ class App extends Component {
           </form>
         </div>
         <div id="app-left-side-panel">
-          <h2>Filter Region</h2>
           {this.createRegionCheckboxes()}
           <h2>Filter Amenities</h2>
           {this.createAmenitiesCheckboxes()}
@@ -895,6 +1042,7 @@ class App extends Component {
               setEndAddress={this.setEndAddress}
               toggleRegionSelected={this.toggleRegionSelected}
               driver={this.driver}
+              session={this.session}
               debugMode={this.state.debugMode}
               routeMode={this.state.routeMode}
               helpText={this.state.helpText}
