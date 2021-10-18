@@ -98,6 +98,19 @@ class Map extends Component {
       ]
     };
 
+    this.regionPolylines = {
+      type: "FeatureCollection",
+      features: [
+        {
+          type: "Feature",
+          geometry: {
+            type: "LineString",
+            coordinates: []
+          }
+        }
+      ]
+    };
+
     this.regionDistances = {
       type: "FeatureCollection",
       features: [
@@ -380,12 +393,31 @@ class Map extends Component {
     });
   };
 
+  geoJSONForRegionPolylines = regionPolylines => {
+    if (regionPolylines.length > 0) console.log("Generating JSON for " + regionPolylines.length + " regionPolylines: ");
+    return regionPolylines.map(polyline => {
+      let coordinates = polyline.map(point => [point.x, point.y]);
+      return {
+        type: "Feature",
+        geometry: {
+          type: "LineString",
+          coordinates: coordinates
+        }
+      };
+    });
+  };
+
   geoJSONForRegionDistances = regionDistances => {
     if (regionDistances.length > 0) console.log("Generating JSON for " + regionDistances.length + " regionDistances: ");
     return regionDistances.map(distanceObject => {
       let startCoord = [distanceObject.start.x, distanceObject.start.y];
       let endCoord = [distanceObject.end.x, distanceObject.end.y];
-      let distanceKm = Math.round(distanceObject.distance / 1000.0);
+      let distance = Math.round(distanceObject.distance / 1000.0);
+      let units = "km";
+      if (this.props.unitsMode === "imperial") {
+        distance = Math.round(distanceObject.distance / 1600.0);
+        units = "miles";
+      }
       return {
         type: "Feature",
         geometry: {
@@ -393,7 +425,7 @@ class Map extends Component {
           coordinates: [startCoord, endCoord]
         },
         properties: {
-          "title": `${distanceKm}km`
+          "title": `${distance}${units}`
         }
       };
     });
@@ -403,7 +435,12 @@ class Map extends Component {
     if (regionAreas.length > 0) console.log("Generating JSON for " + regionAreas.length + " regionAreas: ");
     return regionAreas.map(areaObject => {
       console.log(areaObject);
-      const area = (areaObject.area / 1000000).toFixed(0).toString();
+      let area = (areaObject.area / 1000000).toFixed(0).toString();
+      let units = "km²";
+      if (this.props.unitsMode === "imperial") {
+        area = (areaObject.area / 2560000).toFixed(0).toString();
+        units = "mi²";
+      }
       return {
         type: "Feature",
         geometry: {
@@ -413,7 +450,7 @@ class Map extends Component {
         properties: {
           title: "",
           name: areaObject.area,
-          description: `${areaObject.name}:\n${area}km²`,
+          description: `${areaObject.name}:\n${area}${units}`,
           id: areaObject.regionId,
           "marker-color": "#fc4353"
         }
@@ -460,6 +497,12 @@ class Map extends Component {
     this.map.getSource("regionPolygons").setData(this.regionPolygons);
   }
 
+  setRegionPolylines() {
+    const {regionPolylines} = this.props;
+    this.regionPolylines.features = this.geoJSONForRegionPolylines(regionPolylines);
+    this.map.getSource("regionPolylines").setData(this.regionPolylines);
+  }
+
   setRegionDistances() {
     const {regionDistances} = this.props;
     this.regionDistances.features = this.geoJSONForRegionDistances(regionDistances);
@@ -486,22 +529,40 @@ class Map extends Component {
   fetchRouteFor(startPOI, endPOI) {
     const session = this.props.session();
 
+    let getNodes = `UNWIND nodes(p) AS n`;
+    if (this.props.debugMode.detailedRoute) {
+      // TODO: This Cypher does not always get the direction of the sub-routes correct
+      // Consider re-writing this as a procedure that converts a route path into a list of points or OSMNodes
+      getNodes = `
+      UNWIND relationships(p) AS r
+      WITH r
+      MATCH ()-[fromRel]->(), ()-[toRel]->() WHERE id(fromRel)=r.fromRel AND id(toRel)=r.toRel
+      WITH r, startNode(fromRel) AS fromWayNode, startNode(toRel) as toWayNode
+      MATCH (fromWayNode)-[rx:NEXT*]-(toWayNode)
+      UNWIND rx AS wayRel
+      WITH startNode(wayRel) AS wayNode, r
+      MATCH (wayNode)-[:NODE]->(locationNode)
+      WITH collect(locationNode) AS locations, endNode(r) AS endLocation
+      WITH reduce(s = [endLocation], x IN reverse(locations) | s + x) AS locations
+      UNWIND locations AS n
+      `;
+    }
     let query;
-
     if (this.props.routeMode === "shortestpath") {
       query = `
-    MATCH (a:PointOfInterest) WHERE a.node_osm_id = toInteger($startPOI)
-    MATCH (b:PointOfInterest) WHERE b.node_osm_id = toInteger($endPOI)
-    MATCH p=shortestPath((a)-[:ROUTE*..200]-(b))
-    UNWIND nodes(p) AS n
-    RETURN COLLECT([n.location.longitude,n.location.latitude]) AS route
+      MATCH (a:PointOfInterest) WHERE a.node_osm_id = toInteger($startPOI)
+      MATCH (b:PointOfInterest) WHERE b.node_osm_id = toInteger($endPOI)
+      MATCH p=shortestPath((a)-[:ROUTE*..2000]-(b))
+      ${getNodes}
+      RETURN COLLECT([n.location.longitude,n.location.latitude]) AS route
     `;
     } else if (this.props.routeMode === "dijkstra") {
       query = `
       MATCH (a:PointOfInterest) WHERE a.node_osm_id = toInteger($startPOI)
       MATCH (b:PointOfInterest) WHERE b.node_osm_id = toInteger($endPOI)
       CALL apoc.algo.dijkstra(a,b,'ROUTE', 'distance') YIELD path, weight
-      UNWIND nodes(path) AS n
+      WITH path AS p
+      ${getNodes}
       RETURN COLLECT([n.location.longitude, n.location.latitude]) AS route
       `
 
@@ -510,19 +571,20 @@ class Map extends Component {
       MATCH (a:PointOfInterest) WHERE a.node_osm_id = toInteger($startPOI)
       MATCH (b:PointOfInterest) WHERE b.node_osm_id = toInteger($endPOI)
       CALL apoc.algo.aStar(a, b, 'ROUTE', 'distance', 'lat', 'lon') YIELD path, weight
-      UNWIND nodes(path) AS n
+      WITH path AS p
+      ${getNodes}
       RETURN COLLECT([n.location.longitude, n.location.latitude]) AS route
       `
     } else {
       // default query, use if
       query = `
-    MATCH (a:PointOfInterest) WHERE a.node_osm_id = toInteger($startPOI)
-    MATCH (b:PointOfInterest) WHERE b.node_osm_id = toInteger($endPOI)
-    MATCH p=shortestPath((a)-[:ROUTE*..200]-(b))
-    UNWIND nodes(p) AS n
-    RETURN COLLECT([n.location.longitude,n.location.latitude]) AS route
+      MATCH (a:PointOfInterest) WHERE a.node_osm_id = toInteger($startPOI)
+      MATCH (b:PointOfInterest) WHERE b.node_osm_id = toInteger($endPOI)
+      MATCH p=shortestPath((a)-[:ROUTE*..2000]-(b))
+      ${getNodes}
+      RETURN COLLECT([n.location.longitude,n.location.latitude]) AS route
     `;
-    }
+    };
     
     console.log(this);
     console.log(query);
@@ -536,6 +598,7 @@ class Map extends Component {
       })
       .then(result => {
         console.log(result);
+        console.log(result.records[0].get("route"));
         this.routeGeojson.features[0].geometry.coordinates = result.records[0].get("route");
         this.map.getSource("routeGeojson").setData(this.routeGeojson);
       })
@@ -560,6 +623,7 @@ class Map extends Component {
           ).data
         );
       this.setRegionPolygons();
+      this.setRegionPolylines();
       this.setRegionDistances();
       this.setRegionAreas();
       this.setBusinessMarkers();
@@ -627,6 +691,11 @@ class Map extends Component {
       this.map.addSource("regionPolygons", {
         type: "geojson",
         data: this.regionPolygons
+      });
+
+      this.map.addSource("regionPolylines", {
+        type: "geojson",
+        data: this.regionPolylines
       });
 
       this.map.addSource("regionDistances", {
@@ -710,6 +779,21 @@ class Map extends Component {
           "fill-color": "#03F",
           "fill-opacity": 0.3
         }
+      });
+
+      this.map.addLayer({
+        id: "regionPolylines",
+        type: "line",
+        source: "regionPolylines",
+        layout: {
+          "line-cap": "round",
+          "line-join": "round"
+        },
+        paint: {
+          "line-color": "#038",
+          "line-width": 5
+        },
+        filter: ["in", "$type", "LineString"]
       });
 
       this.map.addLayer({

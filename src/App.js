@@ -1,6 +1,7 @@
 import React, {Component} from "react";
 import "./App.css";
 import Map from "./components/Map";
+import USSouth from "./components/USSouth";
 import neo4j from "neo4j-driver/lib/browser/neo4j-web";
 
 class App extends Component {
@@ -30,21 +31,25 @@ class App extends Component {
         "Select two places to route between them!"
       ],
       debugMode: {
+        detailedRoute: false,
         debugRouting: false,
         debugPolygons: false,
+        debugPolylines: false,
         debugAreas: false,
         debugDistances: false,
         convexHull: false,
         allPolygons: false
       },
       regionPolygons: [],
+      regionPolylines: [],
       regionDistances: [],
       regionAreas: [],
       filterRegion: {},
       regionIds: [],
       amenityIds: [],
       filterAmenities: {},
-      routeMode: "shortestpath"
+      routeMode: "shortestpath",
+      unitsMode: "metric"
     };
     this.models = {
       "NY": {
@@ -229,24 +234,7 @@ class App extends Component {
           }
         }
       },
-      "USS": {
-        mapCenter: {
-          latitude: 35.9085,
-          longitude: -78.8480,
-          radius: 2.5,
-          zoom: 11
-        },
-        database: "ussouth",
-        regions: {
-          "Counties": {
-            "admin_level": 6,
-            "type": "County",
-            "regions": {
-              "Orange": {"name": "Orange County", id: 2528730}
-            }
-          }
-        }
-      }
+      "USS": USSouth
     };
     console.log("Starting with location: " + window.location.pathname)
     var modelName = "unknown";
@@ -350,10 +338,21 @@ class App extends Component {
     const target = event.target;
     const value = target.value;
     this.setState(
-      {
-        routeMode: value
-      },
-      () => console.log(this.state.routeMode)
+        {
+          routeMode: value
+        },
+        () => console.log(this.state.routeMode)
+    );
+  };
+
+  handleUnitsChange = event => {
+    const target = event.target;
+    const value = target.value;
+    this.setState(
+        {
+          unitsMode: value
+        },
+        () => console.log(this.state.unitsMode)
     );
   };
 
@@ -367,6 +366,7 @@ class App extends Component {
       debugMode: value
     }, () => {
       this.fetchSelectedRegions();
+      this.fetchSelectedRegionsLines();
       this.fetchRegionAreas();
       this.fetchRegionDistances();
     });
@@ -404,6 +404,7 @@ class App extends Component {
     }, () => {
       this.fetchBusinesses();
       this.fetchSelectedRegions();
+      this.fetchSelectedRegionsLines();
       this.fetchRegionAreas();
       this.fetchRegionDistances();
     });
@@ -434,6 +435,7 @@ class App extends Component {
     }, () => {
       this.fetchBusinesses();
       this.fetchSelectedRegions();
+      this.fetchSelectedRegionsLines();
       this.fetchRegionAreas();
       this.fetchRegionDistances();
     });
@@ -567,8 +569,7 @@ class App extends Component {
       let queryResult = this.state.debugMode.convexHull ? "spatial.algo.convexHull(p.polygon)" : "p.polygon";
       let query = `MATCH (r:OSMRelation)-[:POLYGON_STRUCTURE*]->(p) USING INDEX r:OSMRelation(relation_osm_id)
         WHERE r.relation_osm_id IN $regionIds AND exists(p.polygon)
-      RETURN r.relation_osm_id AS region_id, ${queryResult} as region
-      `;
+      RETURN r.relation_osm_id AS region_id, ${queryResult} as region`;
       console.log(query);
 
       session
@@ -593,6 +594,36 @@ class App extends Component {
           });
     } else {
       this.setState({regionPolygons: []});
+    }
+  };
+
+  fetchSelectedRegionsLines = () => {
+    if (this.state.regionIds && this.state.debugMode.debugPolylines) {
+
+      const session = this.session();
+
+      let query = `MATCH (r:OSMRelation)-[:POLYLINE_STRUCTURE*]->(p) USING INDEX r:OSMRelation(relation_osm_id)
+        WHERE r.relation_osm_id IN $regionIds AND exists(p.polyline) AND size(p.polyline)>1
+      RETURN r.relation_osm_id AS region_id, p.polyline as region`;
+      console.log(query);
+
+      session
+          .run(query, {regionIds: this.state.regionIds})
+          .then(result => {
+            const regionPolylines = result.records.map(r => {
+              let polyline = r.get("region");
+              return polyline;
+            });
+            this.setState({regionPolylines});
+            session.close();
+          })
+          .catch(e => {
+            // TODO: handle errors.
+            console.log(e);
+            session.close();
+          });
+    } else {
+      this.setState({regionPolylines: []});
     }
   };
 
@@ -862,12 +893,16 @@ class App extends Component {
         <h2>Filter {group}</h2>
       );
       let regionKeys = Object.keys(this.model().regions[group].regions);
-      for (let i = 0; i < regionKeys.length; i++) {
+      for (let i = 0; i < regionKeys.length && i < 20; i++) {
         let key = regionKeys[i];
+        let display = "hidden";
+        if (i < 20) {
+          display = "block";
+        }
         let region = this.model().regions[group].regions[key];
         let elementId = "region-" + region.id;
         rows.push(
-          <div key={key} className="row">
+          <div key={key} className="row" display={display}>
             <input
               id={elementId}
               type="checkbox"
@@ -1043,24 +1078,69 @@ class App extends Component {
               </div>
             </fieldset>
           </div>
+          <h2>Units</h2>
+          <div className="row">
+            <fieldset>
+              <div>
+                <input
+                    type="radio"
+                    id="metric"
+                    name="metric"
+                    value="metric"
+                    checked={this.state.unitsMode === "metric"}
+                    onChange={this.handleUnitsChange}
+                />
+                <label>Metric</label>
+              </div>
+              <div>
+                <input
+                    type="radio"
+                    id="imperial"
+                    name="imperial"
+                    value="imperial"
+                    checked={this.state.unitsMode === "imperial"}
+                    onChange={this.handleUnitsChange}
+                />
+                <label>Imperial</label>
+              </div>
+            </fieldset>
+          </div>
           <h2>Options</h2>
           <div className="row">
             <input
-              type="checkbox"
-              name="debugRouting"
-              checked={this.state.debugMode.debugRouting}
-              onChange={this.handleDebugChange}
+                type="checkbox"
+                name="detailedRoute"
+                checked={this.state.debugMode.detailedRoute}
+                onChange={this.handleDebugChange}
+            />
+            Show Detailed Route
+          </div>
+          <div className="row">
+            <input
+                type="checkbox"
+                name="debugRouting"
+                checked={this.state.debugMode.debugRouting}
+                onChange={this.handleDebugChange}
             />
             Debug Routing Graph
           </div>
           <div className="row">
             <input
-              type="checkbox"
-              name="debugPolygons"
-              checked={this.state.debugMode.debugPolygons}
-              onChange={this.handleDebugChange}
+                type="checkbox"
+                name="debugPolygons"
+                checked={this.state.debugMode.debugPolygons}
+                onChange={this.handleDebugChange}
             />
-            Show Selected Polygons
+            Show Selected Regions
+          </div>
+          <div className="row">
+            <input
+                type="checkbox"
+                name="debugPolylines"
+                checked={this.state.debugMode.debugPolylines}
+                onChange={this.handleDebugChange}
+            />
+            Show Selected Region Lines
           </div>
           <div className="row">
             <input
@@ -1107,6 +1187,7 @@ class App extends Component {
               mapCenter={this.state.mapCenter}
               businesses={this.state.pois}
               regionPolygons={this.state.regionPolygons}
+              regionPolylines={this.state.regionPolylines}
               regionDistances={this.state.regionDistances}
               regionAreas={this.state.regionAreas}
               businessSelected={this.businessSelected}
@@ -1119,6 +1200,7 @@ class App extends Component {
               session={this.session}
               debugMode={this.state.debugMode}
               routeMode={this.state.routeMode}
+              unitsMode={this.state.unitsMode}
               helpText={this.state.helpText}
             />
           </div>
