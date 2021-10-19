@@ -154,7 +154,7 @@ body.application {
   color: #fff;
   position: fixed;
   top: 80px;
-  width: 15%;
+  width: 200pt;
   z-index: 1;
   padding: 15px 0 10px 20px;
 }

@@ -1158,7 +1158,7 @@ class App extends Component {
               checked={this.state.debugMode.debugDistances}
               onChange={this.handleDebugChange}
             />
-            Show Distances between Polygons
+            Show Distances
           </div>
           <div className="row">
             <input
@@ -1167,7 +1167,7 @@ class App extends Component {
               checked={this.state.debugMode.allPolygons}
               onChange={this.handleDebugChange}
             />
-            Include sub-polygons in distances
+            Include sub-polygons
           </div>
           <div className="row">
             <input

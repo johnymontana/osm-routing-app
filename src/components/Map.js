@@ -653,8 +653,8 @@ class Map extends Component {
         source: "polygon",
         layout: {},
         paint: {
-          "fill-color": "blue",
-          "fill-opacity": 0.6
+          "fill-color": "green",
+          "fill-opacity": 0.2
         }
       });
 
